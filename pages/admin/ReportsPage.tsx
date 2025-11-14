@@ -1,0 +1,197 @@
+import React, { useState } from 'react';
+import { FiPrinter, FiDownload, FiCheck, FiX, FiClock, FiHelpCircle } from 'react-icons/fi';
+import { useData } from '../../contexts/DataContext';
+import { useSettings } from '../../contexts/SettingsContext';
+import { Student, AttendanceStatus } from '../../types';
+
+type StatusKey = 'H' | 'T' | 'S' | 'I' | 'A';
+interface StudentReportRow {
+  student: Student;
+  statuses: { [day: number]: StatusKey };
+  summary: Record<StatusKey, number>;
+}
+interface GeneratedReport {
+  daysHeader: number[];
+  studentData: StudentReportRow[];
+  overallSummary: { Hadir: number; Terlambat: number; Sakit: number; Izin: number; Alfa: number; };
+  period: string;
+}
+
+const statusMap: { [key in AttendanceStatus]: { key: StatusKey, text: string, color: string, bgColor: string, icon: React.ReactElement } } = {
+  [AttendanceStatus.PRESENT]: { key: 'H', text: 'Hadir', color: 'text-green-700', bgColor: 'bg-green-100', icon: <FiCheck/> },
+  [AttendanceStatus.LATE]: { key: 'T', text: 'Terlambat', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: <FiClock/> },
+  [AttendanceStatus.SICK]: { key: 'S', text: 'Sakit', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: <FiHelpCircle/> },
+  [AttendanceStatus.PERMIT]: { key: 'I', text: 'Izin', color: 'text-indigo-700', bgColor: 'bg-indigo-100', icon: <FiHelpCircle/> },
+  [AttendanceStatus.ABSENT]: { key: 'A', text: 'Alfa', color: 'text-red-700', bgColor: 'bg-red-100', icon: <FiX/> },
+  [AttendanceStatus.LEAVE_EARLY]: { key: 'H', text: 'Hadir', color: 'text-green-700', bgColor: 'bg-green-100', icon: <FiCheck/> },
+};
+
+const SummaryCard: React.FC<{ title: string; value: number; color: string; }> = ({ title, value, color }) => (
+    <div className={`bg-white p-4 rounded-lg shadow-sm border border-slate-200 border-t-4 ${color}`}>
+        <p className="text-3xl font-bold text-slate-800">{value}</p>
+        <p className="text-sm font-medium text-slate-500 mt-1">{title}</p>
+    </div>
+);
+
+const ReportsPage: React.FC = () => {
+    const { students, classes, attendanceLogs } = useData();
+    const { settings } = useSettings();
+    const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+    const [classFilter, setClassFilter] = useState('');
+    const [reportData, setReportData] = useState<GeneratedReport | null>(null);
+
+    const handleGenerateReport = () => {
+        const [year, monthNum] = month.split('-').map(Number);
+        const daysInMonth = new Date(year, monthNum, 0).getDate();
+        const daysHeader = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+        const startDate = new Date(year, monthNum - 1, 1);
+        const endDate = new Date(year, monthNum - 1, daysInMonth, 23, 59, 59);
+
+        const periodString = startDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) + ' - ' + endDate.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+        const filteredStudents = students.filter(s => !classFilter || s.classId === classFilter);
+        const logsInRange = attendanceLogs.filter(log => {
+            const logDate = new Date(log.timestamp);
+            return logDate >= startDate && logDate <= endDate;
+        });
+
+        const studentData: StudentReportRow[] = filteredStudents.map(student => {
+            const statuses: { [day: number]: StatusKey } = {};
+            const summary: Record<StatusKey, number> = { H: 0, T: 0, S: 0, I: 0, A: 0 };
+            
+            daysHeader.forEach(day => {
+                const dayDate = new Date(year, monthNum - 1, day);
+                const dayLogs = logsInRange.filter(log => log.studentId === student.id && new Date(log.timestamp).getDate() === day);
+                const checkInLog = dayLogs.find(l => l.type === 'in');
+                if (checkInLog) {
+                    const statusInfo = statusMap[checkInLog.status];
+                    statuses[day] = statusInfo.key;
+                    if (summary[statusInfo.key] !== undefined) { summary[statusInfo.key]++; }
+                } else {
+                     const dayOfWeek = dayDate.getDay(); if(dayOfWeek !== 0){ statuses[day] = 'A'; summary['A']++; }
+                }
+            });
+            return { student, statuses, summary };
+        });
+
+        const overallSummary = studentData.reduce((acc, row) => {
+            acc.Hadir += row.summary.H; acc.Terlambat += row.summary.T; acc.Sakit += row.summary.S;
+            acc.Izin += row.summary.I; acc.Alfa += row.summary.A; return acc;
+        }, { Hadir: 0, Terlambat: 0, Sakit: 0, Izin: 0, Alfa: 0 });
+
+        setReportData({ daysHeader, studentData, overallSummary, period: periodString });
+    };
+    
+    const handlePrint = () => {
+        if (!reportData) return;
+        const { daysHeader, studentData, period } = reportData;
+        const className = classFilter ? classes.find(c => c.id === classFilter)?.name : 'Semua Kelas';
+        let htmlContent = `
+            <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Laporan Absensi Bulanan - ${period}</title><style>body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; margin: 0; font-size: 9pt; background-color: #fff; color: #333; } .page-container { padding: 1.5cm; } .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; } .header img { height: 60px; width: 60px; object-fit: contain; margin-right: 20px; } .header-text { flex-grow: 1; } .header-text h1 { margin: 0; font-size: 18pt; font-weight: 600; } .header-text h2 { margin: 0; font-size: 12pt; font-weight: 400; color: #555; } .report-info { text-align: right; font-size: 10pt; } table { width: 100%; border-collapse: collapse; font-size: 8pt; } th, td { border: 1px solid #ddd; padding: 5px; text-align: center; vertical-align: middle; } thead th { background-color: #f2f2f2; color: #333; font-weight: 600; padding: 8px 5px; } .col-student { text-align: left; white-space: nowrap; width: 20%; } .col-nis { white-space: nowrap; font-family: 'Courier New', Courier, monospace; width: 8%; } tbody tr:nth-child(even) { background-color: #f9f9f9; } .status-H { background-color: #e6f7ec !important; } .status-T { background-color: #fffbe6 !important; } .status-S { background-color: #e6f7ff !important; } .status-I { background-color: #f0f5ff !important; } .status-A { background-color: #fff1f0 !important; } .summary-col { font-weight: bold; } .summary-H { background-color: #d1fae5 !important; } .summary-T { background-color: #fef3c7 !important; } .summary-S { background-color: #dbeafe !important; } .summary-I { background-color: #e0e7ff !important; } .summary-A { background-color: #fee2e2 !important; } .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; font-size: 8pt; color: #777; display: flex; justify-content: space-between; } .signature-block { margin-top: 50px; text-align: right; } .signature-block .location-date { margin-bottom: 5px; } .signature-block .role { margin-bottom: 60px; } .signature-block .name { font-weight: bold; text-decoration: underline; } @media print { @page { size: A4 landscape; margin: 0; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style></head><body><div class="page-container"><div class="header">${settings?.schoolLogoUrl ? `<img src="${settings.schoolLogoUrl}" alt="Logo">` : ''}<div class="header-text"><h1>Laporan Absensi Bulanan</h1><h2>${settings?.schoolName || 'Sistem Absensi RFID'}</h2></div><div class="report-info"><strong>Periode:</strong><br>${period}<br><strong>Kelas:</strong> ${className}</div></div><table><thead><tr><th class="col-student">NAMA SISWA</th><th class="col-nis">NIS</th>${daysHeader.map(day => `<th>${String(day).padStart(2, '0')}</th>`).join('')}<th class="summary-col summary-H">H</th> <th class="summary-col summary-T">T</th><th class="summary-col summary-S">S</th> <th class="summary-col summary-I">I</th><th class="summary-col summary-A">A</th></tr></thead><tbody>${studentData.map(row => `<tr><td class="col-student">${row.student.name}</td><td class="col-nis">${row.student.nis}</td>${daysHeader.map(day => { const status = row.statuses[day]; return status ? `<td class="status-${status}">${status}</td>` : `<td></td>`; }).join('')}<td class="summary-col summary-H">${row.summary.H || 0}</td><td class="summary-col summary-T">${row.summary.T || 0}</td><td class="summary-col summary-S">${row.summary.S || 0}</td><td class="summary-col summary-I">${row.summary.I || 0}</td><td class="summary-col summary-A">${row.summary.A || 0}</td></tr>`).join('')}</tbody></table><div class="signature-block"><p class="location-date">Rowosari, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p><p class="role">Kepala Sekolah,</p><p class="name">_________________________</p></div><div class="footer"><span>Dicetak pada: ${new Date().toLocaleString('id-ID')}</span><span>Laporan ini dibuat oleh Sistem Absensi RFID</span></div></div></body></html>`;
+        const printWindow = window.open('', '_blank');
+        if (printWindow) { printWindow.document.open(); printWindow.document.write(htmlContent); printWindow.document.close(); setTimeout(() => { printWindow.print(); }, 250); } else { alert('Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini.'); }
+    };
+
+    const handleExport = () => {
+        if (!reportData) return;
+        const { daysHeader, studentData } = reportData;
+        const headers = ['NAMA SISWA', 'NIS', ...daysHeader.map(d => d.toString().padStart(2, '0')), 'H', 'T', 'S', 'I', 'A'];
+        const csvRows = [headers.join(',')];
+        studentData.forEach(row => { const values = [`"${row.student.name}"`, row.student.nis, ...daysHeader.map(day => row.statuses[day] || '-'), row.summary.H, row.summary.T, row.summary.S, row.summary.I, row.summary.A]; csvRows.push(values.join(',')); });
+        const csvString = csvRows.join('\n'); const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.setAttribute('href', url); link.setAttribute('download', `laporan_absensi_${month}.csv`); link.style.visibility = 'hidden';
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+    
+    const getStatusCell = (statusKey: StatusKey | undefined) => {
+        if (!statusKey) return <td className="p-1 border text-center text-slate-400">-</td>;
+        const styleMap: Record<StatusKey, string> = { 'H': 'bg-green-100 text-green-800', 'T': 'bg-yellow-100 text-yellow-800', 'S': 'bg-blue-100 text-blue-800', 'I': 'bg-indigo-100 text-indigo-800', 'A': 'bg-red-100 text-red-800' };
+        return <td className={`p-1 border text-center font-semibold text-xs ${styleMap[statusKey]}`}>{statusKey}</td>
+    }
+
+  return (
+    <div className="animate-fade-in">
+        <h1 className="text-3xl font-bold text-slate-800 mb-6">Laporan Bulanan</h1>
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 mb-6 no-print">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Pilih Bulan</label>
+                <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Kelas</label>
+                <select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="w-full py-2.5 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">Semua Kelas</option>
+                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            </div>
+            <button onClick={handleGenerateReport} className="bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-indigo-700 h-11 transition-colors">
+                Tampilkan Laporan
+            </button>
+        </div>
+      </div>
+      
+      {!reportData ? (
+        <div className="text-center py-10 bg-white rounded-lg shadow-sm border border-slate-200">
+            <FiPrinter className="mx-auto text-5xl text-slate-300" />
+            <p className="mt-4 text-slate-500">Silakan pilih bulan dan kelas, lalu klik "Tampilkan Laporan".</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 printable-area">
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Laporan Absensi</h2>
+                  <p className="text-slate-600">Periode: {reportData.period}</p>
+                </div>
+                <div className="flex space-x-2 no-print">
+                    <button onClick={handlePrint} className="bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-800 flex items-center transition-colors"><FiPrinter className="mr-2"/>Cetak</button>
+                    <button onClick={handleExport} className="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center transition-colors"><FiDownload className="mr-2"/>Excel</button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                <SummaryCard title="Hadir" value={reportData.overallSummary.Hadir} color="border-green-400" />
+                <SummaryCard title="Terlambat" value={reportData.overallSummary.Terlambat} color="border-yellow-400" />
+                <SummaryCard title="Sakit" value={reportData.overallSummary.Sakit} color="border-blue-400" />
+                <SummaryCard title="Izin" value={reportData.overallSummary.Izin} color="border-indigo-400" />
+                <SummaryCard title="Alfa" value={reportData.overallSummary.Alfa} color="border-red-400" />
+            </div>
+            
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse border border-slate-200">
+                    <thead className="bg-slate-100">
+                        <tr>
+                            <th className="p-2 border border-slate-200 font-semibold text-slate-600 sticky left-0 bg-slate-100 z-10 w-48">NAMA SISWA</th>
+                            <th className="p-2 border border-slate-200 font-semibold text-slate-600 w-24">NIS</th>
+                            {reportData.daysHeader.map(day => <th key={day} className="p-1 border border-slate-200 text-center font-semibold text-slate-500 w-8">{day.toString().padStart(2, '0')}</th>)}
+                            <th className="p-1 border border-slate-200 text-center font-semibold text-green-600 bg-green-50 w-8">H</th>
+                            <th className="p-1 border border-slate-200 text-center font-semibold text-yellow-600 bg-yellow-50 w-8">T</th>
+                            <th className="p-1 border border-slate-200 text-center font-semibold text-blue-600 bg-blue-50 w-8">S</th>
+                            <th className="p-1 border border-slate-200 text-center font-semibold text-indigo-600 bg-indigo-50 w-8">I</th>
+                            <th className="p-1 border border-slate-200 text-center font-semibold text-red-600 bg-red-50 w-8">A</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {reportData.studentData.map(row => (
+                            <tr key={row.student.id} className="hover:bg-slate-50">
+                                <td className="p-2 border border-slate-200 font-medium text-slate-800 sticky left-0 bg-white hover:bg-slate-50 z-10">{row.student.name}</td>
+                                <td className="p-2 border border-slate-200 text-slate-600">{row.student.nis}</td>
+                                {reportData.daysHeader.map(day => getStatusCell(row.statuses[day]))}
+                                <td className="p-1 border border-slate-200 text-center font-bold bg-green-50 text-green-700">{row.summary.H || 0}</td>
+                                <td className="p-1 border border-slate-200 text-center font-bold bg-yellow-50 text-yellow-700">{row.summary.T || 0}</td>
+                                <td className="p-1 border border-slate-200 text-center font-bold bg-blue-50 text-blue-700">{row.summary.S || 0}</td>
+                                <td className="p-1 border border-slate-200 text-center font-bold bg-indigo-50 text-indigo-700">{row.summary.I || 0}</td>
+                                <td className="p-1 border border-slate-200 text-center font-bold bg-red-50 text-red-700">{row.summary.A || 0}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ReportsPage;

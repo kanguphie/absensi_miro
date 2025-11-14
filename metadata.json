@@ -1,0 +1,5 @@
+{
+  "name": "Sistem Absensi RFID MI Islamiyah Rowosari",
+  "description": "A modern, real-time, RFID-based student attendance system with a Kiosk Mode for check-ins and a comprehensive Admin Panel for data management and reporting.",
+  "requestFramePermissions": []
+}
