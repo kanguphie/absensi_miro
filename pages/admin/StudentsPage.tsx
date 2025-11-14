@@ -292,6 +292,8 @@ const StudentsPage: React.FC = () => {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState('25');
 
   const getClassName = (classId: string) => { return classes.find(c => c.id === classId)?.name || 'N/A'; }
 
@@ -333,9 +335,24 @@ const StudentsPage: React.FC = () => {
     return sortableItems;
   }, [filteredStudents, sortConfig, classes]);
   
-  // Clear selection when filters change
+  const paginatedStudents = useMemo(() => {
+    if (rowsPerPage === 'all') {
+        return sortedStudents;
+    }
+    const numRows = parseInt(rowsPerPage, 10);
+    const startIndex = (currentPage - 1) * numRows;
+    return sortedStudents.slice(startIndex, startIndex + numRows);
+  }, [sortedStudents, currentPage, rowsPerPage]);
+
+  const totalPages = useMemo(() => {
+    if (rowsPerPage === 'all' || sortedStudents.length === 0) return 1;
+    const numRows = parseInt(rowsPerPage, 10);
+    return Math.ceil(sortedStudents.length / numRows);
+  }, [sortedStudents.length, rowsPerPage]);
+
   useEffect(() => {
     setSelectedIds(new Set());
+    setCurrentPage(1);
   }, [searchTerm, filterClass]);
 
   const requestSort = (key: SortableKeys) => {
@@ -469,22 +486,39 @@ const StudentsPage: React.FC = () => {
       )}
 
       <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative md:col-span-2">
-            <FiSearch className="absolute top-1/2 -translate-y-1/2 left-4 text-slate-400" />
-            <input
-              type="text" placeholder="Cari nama atau NIS..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-          <div>
-            <select value={filterClass} onChange={e => setFilterClass(e.target.value)}
-              className="w-full py-2.5 px-4 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Semua Kelas</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+            <div className="relative w-full md:flex-1">
+                <FiSearch className="absolute top-1/2 -translate-y-1/2 left-4 text-slate-400" />
+                <input
+                  type="text" placeholder="Cari nama atau NIS..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+            </div>
+            <div className="w-full md:w-auto md:min-w-[180px]">
+                <select value={filterClass} onChange={e => setFilterClass(e.target.value)}
+                  className="w-full py-2.5 px-4 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Semua Kelas</option>
+                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            </div>
+             <div className="flex items-center w-full md:w-auto">
+                <label htmlFor="rowsPerPage" className="text-sm font-medium text-slate-700 mr-2 whitespace-nowrap">Baris:</label>
+                <select
+                    id="rowsPerPage"
+                    value={rowsPerPage}
+                    onChange={e => {
+                        setRowsPerPage(e.target.value);
+                        setCurrentPage(1);
+                    }}
+                    className="w-full md:w-auto py-2.5 px-4 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="all">Semua</option>
+                </select>
+            </div>
         </div>
       </div>
 
@@ -511,7 +545,7 @@ const StudentsPage: React.FC = () => {
             <tbody>
               {loading ? (
                 <tr><td colSpan={6} className="text-center p-4">Memuat data...</td></tr>
-              ) : sortedStudents.length > 0 ? sortedStudents.map(student => (
+              ) : paginatedStudents.length > 0 ? paginatedStudents.map(student => (
                 <tr key={student.id} className={`border-b border-slate-100 ${selectedIds.has(student.id) ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
                    <td className="p-4 text-center">
                     <input type="checkbox"
@@ -541,6 +575,44 @@ const StudentsPage: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="p-4 border-t border-slate-200 text-sm text-slate-600 flex flex-col sm:flex-row items-center justify-between gap-4">
+          {sortedStudents.length > 0 ? (
+            <>
+                <span className="text-sm text-slate-600">
+                    Menampilkan <strong>{
+                        rowsPerPage === 'all' ? 1 : (currentPage - 1) * parseInt(rowsPerPage, 10) + 1
+                    } - {
+                        rowsPerPage === 'all' ? sortedStudents.length : Math.min(currentPage * parseInt(rowsPerPage, 10), sortedStudents.length)
+                    }</strong> dari <strong>{sortedStudents.length}</strong> siswa.
+                </span>
+                {totalPages > 1 && (
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1 border border-slate-300 rounded-md text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Sebelumnya
+                        </button>
+                        <span className="font-medium">
+                            Halaman {currentPage} dari {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="px-3 py-1 border border-slate-300 rounded-md text-sm hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Berikutnya
+                        </button>
+                    </div>
+                )}
+            </>
+          ) : (
+            <span>
+                Menampilkan <strong>0</strong> dari <strong>{students.length}</strong> total siswa.
+            </span>
+          )}
         </div>
       </div>
       {isImportModalOpen && <ImportModal onClose={() => setIsImportModalOpen(false)} />}
