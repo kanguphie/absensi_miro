@@ -19,16 +19,10 @@ const timeToMinutes = (time: string): number => {
 };
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
   const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
-    if (!isAuthenticated) {
-      setSettings(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
       const data = await api.getSettings();
@@ -39,7 +33,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   useEffect(() => {
     fetchSettings();

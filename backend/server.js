@@ -9,8 +9,13 @@ const apiRoutes = require('./routes/api');
 const app = express();
 
 // Middleware
-app.use(cors());
-// Increase payload size limit for base64 photo uploads
+// Updated CORS configuration to explicitly allow requests from any origin.
+// This is necessary for the frontend hosted on AI Studio to communicate with this backend.
+app.use(cors({
+  origin: '*', // Allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow common methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allow necessary headers
+}));
 app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 

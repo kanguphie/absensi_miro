@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { FiLogIn, FiUser, FiLock, FiEye, FiEyeOff, FiHome } from 'react-icons/fi';
 
 declare const Swal: any;
@@ -10,6 +11,7 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const { login, loading } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,9 +39,9 @@ const LoginPage: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Kementerian_Agama_new_logo.png/535px-Kementerian_Agama_new_logo.png" alt="School Logo" className="w-20 h-20 mx-auto mb-4" />
+                <img src={settings?.schoolLogoUrl || "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Kementerian_Agama_new_logo.png/535px-Kementerian_Agama_new_logo.png"} alt="School Logo" className="w-20 h-20 mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-slate-800">Admin Login</h1>
-            <p className="text-slate-500 mt-2">Sistem Absensi RFID</p>
+            <p className="text-slate-500 mt-2">{settings?.schoolName || 'Sistem Absensi RFID'}</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
             <div className="relative">

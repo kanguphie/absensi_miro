@@ -1,9 +1,12 @@
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { User, Student, SchoolClass, AttendanceLog, Setting } = require('../models');
 const authMiddleware = require('../middleware/authMiddleware');
+const { initialSettings } = require('../util/initialData');
+
 
 const router = express.Router();
 
@@ -50,7 +53,12 @@ router.post('/auth/login', async (req, res) => {
 
 // --- Kiosk/Manual Attendance Routes (Public) ---
 const internalRecordAttendance = async (student) => {
-    const settings = await Setting.findOne();
+    // Use findOrCreate to ensure settings always exist, making this endpoint robust
+    const [settings] = await Setting.findOrCreate({
+        where: { id: 1 },
+        defaults: initialSettings
+    });
+    
     if (!settings) return { success: false, message: 'System settings not configured.' };
 
     const now = new Date();
@@ -135,6 +143,21 @@ router.post('/attendance/record-nis', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
 
+// --- Public Settings Route ---
+// This is intentionally made public so kiosk/login page can fetch school name/logo
+router.get('/settings', async (req, res) => {
+    try {
+        const [setting] = await Setting.findOrCreate({
+            where: { id: 1 },
+            defaults: initialSettings
+        });
+        res.json(setting);
+    } catch (error) {
+        console.error("Error fetching settings:", error);
+        res.status(500).json({ message: "Gagal memuat pengaturan dari database." });
+    }
+});
+
 
 // --- Protected Routes ---
 router.use(authMiddleware);
@@ -206,7 +229,6 @@ router.post('/attendance/manual', async (req, res) => {
 });
 
 // Settings
-router.get('/settings', async (req, res) => res.json(await Setting.findOne()));
 router.put('/settings', async (req, res) => {
     const [setting] = await Setting.findOrCreate({ where: { id: 1 } });
     await setting.update(req.body);

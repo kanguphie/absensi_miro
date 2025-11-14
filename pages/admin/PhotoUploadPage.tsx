@@ -37,12 +37,12 @@ const PhotoUploadPage: React.FC = () => {
         const studentMapByNis = new Map(students.map(s => [s.nis, s]));
         const existingFilenames = new Set(photoFiles.map(pf => pf.file.name));
 
-        // FIX: Explicitly type `newPhotoFiles` as `PhotoFile[]` to ensure TypeScript correctly infers the type of the 'status' property.
         const newPhotoFiles: PhotoFile[] = Array.from(files)
             .filter(file => file.type.startsWith('image/') && !existingFilenames.has(file.name))
             .map((file, index) => {
                 const nis = file.name.split('.').slice(0, -1).join('.');
-                const student = studentMapByNis.get(nis) || null;
+                // FIX: Explicitly type the 'student' constant to resolve type inference issue.
+                const student: Student | null = studentMapByNis.get(nis) || null;
                 return {
                     id: `${file.name}-${Date.now()}-${index}`,
                     file,

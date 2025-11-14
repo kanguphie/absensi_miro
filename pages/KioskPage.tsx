@@ -112,15 +112,17 @@ const KioskPage: React.FC = () => {
         playNotificationSound(audioContext, false);
       }
     } catch (error) {
+       const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.';
        Swal.fire({
           icon: 'error',
-          title: 'Koneksi Gagal',
-          text: 'Silakan coba lagi.',
+          title: 'Absensi Gagal',
+          text: errorMessage.includes('configured') ? 'Pengaturan sistem belum siap. Coba lagi dalam beberapa detik.' : errorMessage,
           toast: true,
           position: 'top-end',
           showConfirmButton: false,
-          timer: 4000
+          timer: 5000
         });
+       playNotificationSound(audioContext, false);
     } finally {
       setIsProcessing(false);
       setRfid('');
