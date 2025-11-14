@@ -1,4 +1,5 @@
 
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -17,10 +18,41 @@ const timeToMinutes = (time) => {
     return hours * 60 + minutes;
 };
 
-const toLocalISOString = (date) => {
-    const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-    return (new Date(date - tzoffset)).toISOString().split('T')[0];
+// FIX: Helper function to get the current date and time parts in 'Asia/Jakarta' timezone.
+const getNowInWIB = () => {
+    const now = new Date();
+    // Use Intl.DateTimeFormat for robust timezone handling without external libraries
+    const formatter = new Intl.DateTimeFormat('en-CA', { // 'en-CA' gives YYYY-MM-DD format
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    });
+    
+    const parts = formatter.formatToParts(now).reduce((acc, part) => {
+        if (part.type !== 'literal') {
+            acc[part.type] = part.value;
+        }
+        return acc;
+    }, {});
+
+    const dateStr = `${parts.year}-${parts.month}-${parts.day}`;
+    const timeStr = `${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}`; // Handle midnight case
+
+    const wibDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+
+    return {
+        dateObject: wibDate,
+        day: wibDate.getDay(),
+        dateString: dateStr,
+        timeString: timeStr
+    };
 };
+
 
 const getAttendancePeriod = (currentTime, opHours) => {
     const currentMinutes = timeToMinutes(currentTime);
@@ -53,36 +85,43 @@ router.post('/auth/login', async (req, res) => {
 
 // --- Kiosk/Manual Attendance Routes (Public) ---
 const internalRecordAttendance = async (student) => {
-    // Use findOrCreate to ensure settings always exist, making this endpoint robust
-    const [settings] = await Setting.findOrCreate({
+    const [settingsInstance] = await Setting.findOrCreate({
         where: { id: 1 },
         defaults: initialSettings
     });
     
-    if (!settings) return { success: false, message: 'System settings not configured.' };
+    if (!settingsInstance) return { success: false, message: 'System settings not configured.' };
 
-    const now = new Date();
-    const todayStr = toLocalISOString(now);
+    const settings = settingsInstance.get({ plain: true });
+    if (typeof settings.operatingHours === 'string') {
+        try { settings.operatingHours = JSON.parse(settings.operatingHours); }
+        catch (e) { console.error("Error parsing operatingHours:", e); settings.operatingHours = []; }
+    }
+    if (typeof settings.holidays === 'string') {
+        try { settings.holidays = JSON.parse(settings.holidays); }
+        catch(e) { console.error("Error parsing holidays:", e); settings.holidays = []; }
+    }
+
+    // FIX: Use WIB timezone for all calculations
+    const { dateObject, day, dateString: todayStr, timeString: currentTime } = getNowInWIB();
 
     if (settings.holidays.includes(todayStr)) {
         return { success: false, message: 'Hari ini adalah hari libur' };
     }
 
-    const day = now.getDay();
     const dayGroup = (day >= 1 && day <= 4) ? 'mon-thu' : (day === 5) ? 'fri' : (day === 6) ? 'sat' : null;
     if (!dayGroup) return { success: false, message: 'Absensi tidak tersedia hari ini' };
 
     const opHours = settings.operatingHours.find(h => h.dayGroup === dayGroup);
     if (!opHours || !opHours.enabled) return { success: false, message: 'Absensi tidak tersedia saat ini' };
 
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const period = getAttendancePeriod(currentTime, opHours);
 
     if (period === 'CLOSED') return { success: false, message: 'Waktu absensi ditutup' };
 
-    const startOfDay = new Date(now);
+    const startOfDay = new Date(dateObject);
     startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(now);
+    const endOfDay = new Date(dateObject);
     endOfDay.setHours(23, 59, 59, 999);
 
     const todayLogs = await AttendanceLog.findAll({
@@ -101,7 +140,7 @@ const internalRecordAttendance = async (student) => {
 
         const newLog = await AttendanceLog.create({
             studentId: student.id, studentName: student.name, studentPhotoUrl: student.photoUrl,
-            className: studentClass?.name || '', timestamp: now, type: 'in', status,
+            className: studentClass?.name || '', timestamp: dateObject, type: 'in', status,
         });
         return { success: true, log: newLog, message: `Selamat Pagi, ${student.name}!` };
     }
@@ -117,7 +156,7 @@ const internalRecordAttendance = async (student) => {
         
         const newLog = await AttendanceLog.create({
             studentId: student.id, studentName: student.name, studentPhotoUrl: student.photoUrl,
-            className: studentClass?.name || '', timestamp: now, type: 'out', status,
+            className: studentClass?.name || '', timestamp: dateObject, type: 'out', status,
         });
         return { success: true, log: newLog, message: `Selamat Jalan, ${student.name}!` };
     }
@@ -144,7 +183,6 @@ router.post('/attendance/record-nis', async (req, res) => {
 });
 
 // --- Public Settings Route ---
-// This is intentionally made public so kiosk/login page can fetch school name/logo
 router.get('/settings', async (req, res) => {
     try {
         const [setting] = await Setting.findOrCreate({
