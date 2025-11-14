@@ -531,7 +531,12 @@ const StudentsPage: React.FC = () => {
                     <input type="checkbox"
                       className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                       checked={isAllSelected}
-                      ref={el => el && (el.indeterminate = selectedIds.size > 0 && !isAllSelected)}
+                      ref={el => {
+                        // FIX: The ref callback must not return a value. Wrapped in a block to ensure void return.
+                        if (el) {
+                          el.indeterminate = selectedIds.size > 0 && !isAllSelected;
+                        }
+                      }}
                       onChange={handleSelectAll}
                     />
                 </th>

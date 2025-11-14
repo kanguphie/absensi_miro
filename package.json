@@ -14,7 +14,8 @@
     "recharts": "^3.4.1",
     "react-router-dom": "^7.9.6",
     "react-icons": "^5.5.0",
-    "xlsx": "0.18.5"
+    "xlsx": "0.18.5",
+    "@google/genai": "^1.29.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

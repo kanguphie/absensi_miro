@@ -7,8 +7,9 @@ import { AttendanceStatus } from '../../types';
 
 const StatCard: React.FC<{ icon: React.ReactElement; title: string; value: string | number; gradientColor: string; }> = ({ icon, title, value, gradientColor }) => (
   <div className={`relative overflow-hidden text-white p-5 rounded-xl shadow-lg transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-2xl ${gradientColor}`}>
-    <div className="absolute -right-4 -top-4 text-white/20">
-      {React.cloneElement(icon, { size: 80 })}
+    {/* FIX: Replaced React.cloneElement with a sized container and text-[80px] to avoid a TypeScript error with generic props on the icon. The react-icons SVGs scale with font size. */}
+    <div className="absolute -right-4 -top-4 text-white/20 text-[80px]">
+      {icon}
     </div>
     <p className="text-4xl font-bold">{value}</p>
     <p className="text-sm font-medium mt-1 tracking-wider">{title}</p>

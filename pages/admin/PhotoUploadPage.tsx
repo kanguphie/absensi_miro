@@ -37,7 +37,8 @@ const PhotoUploadPage: React.FC = () => {
         const studentMapByNis = new Map(students.map(s => [s.nis, s]));
         const existingFilenames = new Set(photoFiles.map(pf => pf.file.name));
 
-        const newPhotoFiles = Array.from(files)
+        // FIX: Explicitly type `newPhotoFiles` as `PhotoFile[]` to ensure TypeScript correctly infers the type of the 'status' property.
+        const newPhotoFiles: PhotoFile[] = Array.from(files)
             .filter(file => file.type.startsWith('image/') && !existingFilenames.has(file.name))
             .map((file, index) => {
                 const nis = file.name.split('.').slice(0, -1).join('.');
