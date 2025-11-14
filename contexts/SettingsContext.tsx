@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 import { SchoolSettings, OperatingHours } from '../types';
 import { api } from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface SettingsContextType {
   settings: SchoolSettings | null;
@@ -18,20 +19,27 @@ const timeToMinutes = (time: string): number => {
 };
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [settings, setSettings] = useState<SchoolSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
+    if (!isAuthenticated) {
+      setSettings(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const data = await api.getSettings();
       setSettings(data);
     } catch (error) {
       console.error("Failed to fetch settings", error);
+      setSettings(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchSettings();

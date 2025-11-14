@@ -1,6 +1,8 @@
+
 import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 import { Student, SchoolClass, AttendanceLog, AttendanceStatus } from '../types';
 import { api } from '../services/api';
+import { useAuth } from './AuthContext';
 
 declare const Swal: any;
 
@@ -30,12 +32,20 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
+    if (!isAuthenticated) {
+      setStudents([]);
+      setClasses([]);
+      setAttendanceLogs([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [studentsData, classesData, logsData] = await Promise.all([
@@ -48,11 +58,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAttendanceLogs(logsData);
     } catch (error) {
       console.error("Failed to fetch data", error);
-      Swal.fire('Error', 'Gagal memuat data dari server.', 'error');
+      if (!(error instanceof Error && error.message.includes('Authorization token required'))) {
+        Swal.fire('Error', 'Gagal memuat data dari server.', 'error');
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchData();
@@ -60,18 +72,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const recordAttendance = useCallback(async (rfidUid: string) => {
     const result = await api.recordAttendance(rfidUid);
-    if (result.success) {
-        // Refetch logs to update the UI
-        api.getAttendanceLogs().then(setAttendanceLogs);
+    if (result.success && result.log) {
+        // Prepend new log to avoid a protected API call from public page
+        // Ensure timestamp is a Date object
+        const newLog = { ...result.log, timestamp: new Date(result.log.timestamp) };
+        setAttendanceLogs(prev => [newLog, ...prev]);
     }
     return result;
   }, []);
   
   const recordAttendanceByNis = useCallback(async (nis: string) => {
     const result = await api.recordAttendanceByNis(nis);
-    if (result.success) {
-        // Refetch logs to update the UI
-        api.getAttendanceLogs().then(setAttendanceLogs);
+    if (result.success && result.log) {
+        // Prepend new log to avoid a protected API call from public page
+        const newLog = { ...result.log, timestamp: new Date(result.log.timestamp) };
+        setAttendanceLogs(prev => [newLog, ...prev]);
     }
     return result;
   }, []);

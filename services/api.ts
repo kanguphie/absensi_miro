@@ -1,6 +1,6 @@
 import { Student, SchoolClass, AttendanceLog, SchoolSettings, User, AttendanceStatus } from '../types';
 
-const API_BASE_URL = '/api'; // Use a relative URL, assuming frontend is served or proxied alongside the backend
+const API_BASE_URL = 'https://apimiro.madarussalamsubah.id/api';
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('authToken');
