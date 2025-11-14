@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { FiArrowLeft, FiCheckCircle, FiXCircle, FiLogIn } from 'react-icons/fi';
+import { FiArrowLeft, FiXCircle, FiLogIn } from 'react-icons/fi';
 import { useData } from '../contexts/DataContext';
 import { useSettings } from '../contexts/SettingsContext';
-import AttendanceToast from '../components/AttendanceToast';
+
+declare const Swal: any;
 
 const ManualAttendancePage: React.FC = () => {
   const [nis, setNis] = useState('');
@@ -41,19 +41,47 @@ const ManualAttendancePage: React.FC = () => {
     try {
       const result = await recordAttendanceByNis(nis.trim());
       if (result.success && result.log) {
-        toast.custom(t => <AttendanceToast log={result.log!} message={result.message} />, { id: result.log.id });
+        const statusColor = result.log.status === 'Tepat Waktu' ? '#22c55e' : 
+                            result.log.status === 'Terlambat' ? '#f59e0b' :
+                            '#3b82f6';
+
+        Swal.fire({
+          html: `
+            <div style="display: flex; align-items: flex-start; text-align: left;">
+              <img src="${result.log.studentPhotoUrl}" alt="${result.log.studentName}" style="width: 64px; height: 64px; border-radius: 9999px; object-fit: cover; margin-right: 16px; border: 2px solid rgba(255,255,255,0.5);" />
+              <div style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <p style="font-weight: bold; font-size: 1.125rem; color: #1f2937; margin:0;">${result.log.studentName}</p>
+                  <span style="padding: 4px 8px; font-size: 0.75rem; font-weight: 600; color: white; border-radius: 9999px; background-color: ${statusColor};">
+                    ${result.log.status}
+                  </span>
+                </div>
+                <p style="color: #4b5563; margin: 0;">${result.log.className}</p>
+                <p style="color: #6b7280; font-size: 0.875rem; margin-top: 4px;">${result.message}</p>
+              </div>
+            </div>
+          `,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 6000,
+          timerProgressBar: true,
+          toast: true,
+          background: 'rgba(255, 255, 255, 0.9)',
+          customClass: {
+            popup: 'swal2-backdrop-blur'
+          }
+        });
         playNotificationSound(audioContext, true);
       } else {
-        toast.error(
-          <div className="flex items-center">
-            <FiXCircle className="mr-2" />
-            <span>{result.message}</span>
-          </div>
-        );
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: result.message,
+        });
         playNotificationSound(audioContext, false);
       }
     } catch (error) {
-      toast.error('Terjadi kesalahan koneksi.');
+      Swal.fire('Error', 'Terjadi kesalahan koneksi.', 'error');
     } finally {
       setIsProcessing(false);
       setNis('');

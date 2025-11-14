@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { SchoolClass } from '../../types';
 import { FiPlus, FiEdit, FiTrash2, FiX, FiArchive, FiSave } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+
+declare const Swal: any;
 
 const ClassModal: React.FC<{
   classData: SchoolClass | null;
@@ -16,7 +17,7 @@ const ClassModal: React.FC<{
     if (name.trim()) {
       onSave(classData?.id || null, name.trim());
     } else {
-      toast.error('Nama kelas tidak boleh kosong.');
+      Swal.fire('Error', 'Nama kelas tidak boleh kosong.', 'error');
     }
   };
 
@@ -36,7 +37,7 @@ const ClassModal: React.FC<{
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Contoh: Kelas 1A"
+                    placeholder="Contoh: 1A"
                     autoFocus
                 />
             </div>
@@ -77,9 +78,20 @@ const ClassesPage: React.FC = () => {
   };
 
   const handleDeleteClass = (classData: SchoolClass) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus kelas "${classData.name}"?`)) {
-      deleteClass(classData.id);
-    }
+    Swal.fire({
+      title: 'Apakah Anda yakin?',
+      text: `Anda akan menghapus kelas "${classData.name}". Aksi ini tidak dapat dibatalkan.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Ya, hapus!',
+      cancelButtonText: 'Batal'
+    }).then((result: { isConfirmed: boolean }) => {
+      if (result.isConfirmed) {
+        deleteClass(classData.id);
+      }
+    });
   };
 
   return (

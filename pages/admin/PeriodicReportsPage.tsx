@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { FiPrinter, FiDownload, FiCheck, FiX, FiClock, FiHelpCircle, FiActivity } from 'react-icons/fi';
-import toast from 'react-hot-toast';
 import { useData } from '../../contexts/DataContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { Student, AttendanceStatus } from '../../types';
+import * as XLSX from 'xlsx';
+
+declare const Swal: any;
 
 // Type definitions specific to this report
 type StatusKey = 'H' | 'T' | 'S' | 'I' | 'A';
@@ -76,7 +78,7 @@ const PeriodicReportsPage: React.FC = () => {
         const end = new Date(endDate);
 
         if (start > end) {
-            toast.error("Tanggal mulai tidak boleh setelah tanggal selesai.");
+            Swal.fire('Error', "Tanggal mulai tidak boleh setelah tanggal selesai.", 'error');
             return;
         }
 
@@ -88,12 +90,15 @@ const PeriodicReportsPage: React.FC = () => {
             const logDate = new Date(log.timestamp);
             return logDate >= start && logDate <= new Date(end.getTime() + 24 * 60 * 60 * 1000 - 1);
         });
+
+        const holidays = new Set(settings?.holidays || []);
         
         const studentData: StudentReportRow[] = filteredStudents.map(student => {
             const summary: Record<StatusKey, number> = { H: 0, T: 0, S: 0, I: 0, A: 0 };
             
             datesInRange.forEach(date => {
                 const dateStr = toLocalISOString(date);
+                
                 const dayLogs = logsInRange.filter(log => log.studentId === student.id && toLocalISOString(new Date(log.timestamp)) === dateStr);
                 const checkInLog = dayLogs.find(l => l.type === 'in');
                 
@@ -101,10 +106,15 @@ const PeriodicReportsPage: React.FC = () => {
                     const statusInfo = statusMap[checkInLog.status];
                     if (summary[statusInfo.key] !== undefined) { summary[statusInfo.key]++; }
                 } else {
-                     const dayOfWeek = date.getDay(); 
-                     if(dayOfWeek !== 0){
-                        summary['A']++; 
-                     }
+                    if (holidays.has(dateStr)) return; // Skip holidays
+
+                    const dayOfWeek = date.getDay();
+                    const dayGroup = (dayOfWeek >= 1 && dayOfWeek <= 4) ? 'mon-thu' : (dayOfWeek === 5) ? 'fri' : (dayOfWeek === 6) ? 'sat' : null;
+                    const opHours = settings?.operatingHours.find(h => h.dayGroup === dayGroup);
+
+                    if (dayOfWeek !== 0 && opHours && opHours.enabled) {
+                        summary['A']++;
+                    }
                 }
             });
             return { student, summary };
@@ -130,13 +140,42 @@ const PeriodicReportsPage: React.FC = () => {
 
     const handleExport = () => {
         if (!reportData) return;
-        const { studentData } = reportData;
-        const headers = ['NAMA SISWA', 'NIS', 'Hadir', 'Terlambat', 'Sakit', 'Izin', 'Alfa'];
-        const csvRows = [headers.join(',')];
-        studentData.forEach(row => { const values = [`"${row.student.name}"`, row.student.nis, row.summary.H, row.summary.T, row.summary.S, row.summary.I, row.summary.A]; csvRows.push(values.join(',')); });
-        const csvString = csvRows.join('\n'); const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob);
-        const link = document.createElement('a'); link.setAttribute('href', url); link.setAttribute('download', `rekap_absensi_periodik.csv`); link.style.visibility = 'hidden';
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+
+        const { studentData, period } = reportData;
+        const className = classFilter ? classes.find(c => c.id === classFilter)?.name : 'Semua Kelas';
+
+        const jsonData = studentData.map(row => ({
+            "Nama Siswa": row.student.name,
+            "NIS": row.student.nis,
+            "Hadir": row.summary.H,
+            "Terlambat": row.summary.T,
+            "Sakit": row.summary.S,
+            "Izin": row.summary.I,
+            "Alfa": row.summary.A,
+        }));
+        
+        const title = `Laporan Rekapitulasi Absensi Periodik - ${className}`;
+        const periodInfo = `Periode: ${period}`;
+
+        const worksheet = XLSX.utils.json_to_sheet(jsonData, { origin: 'A4' });
+        
+        XLSX.utils.sheet_add_aoa(worksheet, [[title], [periodInfo], []], { origin: 'A1' });
+        
+        worksheet['!merges'] = [
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+        ];
+
+        worksheet['!cols'] = [
+            { wch: 30 }, { wch: 15 }, { wch: 10 }, { wch: 10 },
+            { wch: 10 }, { wch: 10 }, { wch: 10 },
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `Rekap Absensi`);
+        
+        const fileName = `rekap_absensi_${startDate}_sd_${endDate}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
     }
 
   return (

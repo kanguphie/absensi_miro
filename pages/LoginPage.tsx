@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { FiLogIn, FiUser, FiLock, FiEye, FiEyeOff, FiHome } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+
+declare const Swal: any;
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('admin');
@@ -16,9 +17,18 @@ const LoginPage: React.FC = () => {
     const success = await login(username, password);
     if (success) {
       navigate('/admin');
-      toast.success('Login berhasil!');
+      Swal.fire({
+        icon: 'success',
+        title: 'Login berhasil!',
+        showConfirmButton: false,
+        timer: 1500
+      });
     } else {
-      toast.error('Username atau password salah.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Oops...',
+        text: 'Username atau password salah.',
+      });
     }
   };
 

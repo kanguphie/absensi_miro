@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 
 import { AuthProvider } from './contexts/AuthContext';
 import { DataProvider } from './contexts/DataContext';
@@ -20,6 +19,7 @@ import SettingsPage from './pages/admin/SettingsPage';
 import ManualAttendancePage from './pages/ManualAttendancePage';
 import PeriodicReportsPage from './pages/admin/PeriodicReportsPage';
 import PhotoUploadPage from './pages/admin/PhotoUploadPage';
+import AttendanceManagementPage from './pages/admin/AttendanceManagementPage';
 
 const App: React.FC = () => {
   return (
@@ -44,6 +44,7 @@ const App: React.FC = () => {
                 <Route path="students" element={<StudentsPage />} />
                 <Route path="classes" element={<ClassesPage />} />
                 <Route path="photo-upload" element={<PhotoUploadPage />} />
+                <Route path="attendance-management" element={<AttendanceManagementPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="daily-reports" element={<DailyReportsPage />} />
                 <Route path="periodic-reports" element={<PeriodicReportsPage />} />
@@ -51,17 +52,6 @@ const App: React.FC = () => {
               </Route>
             </Routes>
           </HashRouter>
-          <Toaster
-            position="top-right"
-            reverseOrder={false}
-            toastOptions={{
-              duration: 5000,
-              style: {
-                background: '#333',
-                color: '#fff',
-              },
-            }}
-          />
         </DataProvider>
       </SettingsProvider>
     </AuthProvider>

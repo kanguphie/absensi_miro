@@ -3,6 +3,7 @@ import { FiPrinter, FiDownload, FiCheck, FiX, FiClock, FiHelpCircle } from 'reac
 import { useData } from '../../contexts/DataContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { Student, AttendanceStatus } from '../../types';
+import * as XLSX from 'xlsx';
 
 type StatusKey = 'H' | 'T' | 'S' | 'I' | 'A';
 interface StudentReportRow {
@@ -15,6 +16,12 @@ interface GeneratedReport {
   studentData: StudentReportRow[];
   overallSummary: { Hadir: number; Terlambat: number; Sakit: number; Izin: number; Alfa: number; };
   period: string;
+}
+
+const toLocalISOString = (date: Date) => {
+    const tzoffset = date.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(date.getTime() - tzoffset).toISOString().slice(0, 10);
+    return localISOTime;
 }
 
 const statusMap: { [key in AttendanceStatus]: { key: StatusKey, text: string, color: string, bgColor: string, icon: React.ReactElement } } = {
@@ -55,6 +62,8 @@ const ReportsPage: React.FC = () => {
             const logDate = new Date(log.timestamp);
             return logDate >= startDate && logDate <= endDate;
         });
+        
+        const holidays = new Set(settings?.holidays || []);
 
         const studentData: StudentReportRow[] = filteredStudents.map(student => {
             const statuses: { [day: number]: StatusKey } = {};
@@ -62,14 +71,26 @@ const ReportsPage: React.FC = () => {
             
             daysHeader.forEach(day => {
                 const dayDate = new Date(year, monthNum - 1, day);
-                const dayLogs = logsInRange.filter(log => log.studentId === student.id && new Date(log.timestamp).getDate() === day);
+                const dateStr = toLocalISOString(dayDate);
+                
+                const dayLogs = logsInRange.filter(log => log.studentId === student.id && toLocalISOString(new Date(log.timestamp)) === dateStr);
                 const checkInLog = dayLogs.find(l => l.type === 'in');
+
                 if (checkInLog) {
                     const statusInfo = statusMap[checkInLog.status];
                     statuses[day] = statusInfo.key;
                     if (summary[statusInfo.key] !== undefined) { summary[statusInfo.key]++; }
                 } else {
-                     const dayOfWeek = dayDate.getDay(); if(dayOfWeek !== 0){ statuses[day] = 'A'; summary['A']++; }
+                    if (holidays.has(dateStr)) return; // Skip holidays
+
+                    const dayOfWeek = dayDate.getDay();
+                    const dayGroup = (dayOfWeek >= 1 && dayOfWeek <= 4) ? 'mon-thu' : (dayOfWeek === 5) ? 'fri' : (dayOfWeek === 6) ? 'sat' : null;
+                    const opHours = settings?.operatingHours.find(h => h.dayGroup === dayGroup);
+                    
+                    if (dayOfWeek !== 0 && opHours && opHours.enabled) {
+                        statuses[day] = 'A';
+                        summary['A']++;
+                    }
                 }
             });
             return { student, statuses, summary };
@@ -95,13 +116,52 @@ const ReportsPage: React.FC = () => {
 
     const handleExport = () => {
         if (!reportData) return;
-        const { daysHeader, studentData } = reportData;
-        const headers = ['NAMA SISWA', 'NIS', ...daysHeader.map(d => d.toString().padStart(2, '0')), 'H', 'T', 'S', 'I', 'A'];
-        const csvRows = [headers.join(',')];
-        studentData.forEach(row => { const values = [`"${row.student.name}"`, row.student.nis, ...daysHeader.map(day => row.statuses[day] || '-'), row.summary.H, row.summary.T, row.summary.S, row.summary.I, row.summary.A]; csvRows.push(values.join(',')); });
-        const csvString = csvRows.join('\n'); const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob);
-        const link = document.createElement('a'); link.setAttribute('href', url); link.setAttribute('download', `laporan_absensi_${month}.csv`); link.style.visibility = 'hidden';
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        const { daysHeader, studentData, period } = reportData;
+        const className = classFilter ? classes.find(c => c.id === classFilter)?.name : 'Semua Kelas';
+
+        const title = `Laporan Absensi Bulanan - ${className}`;
+        const periodInfo = `Periode: ${period}`;
+        
+        const headers = ['Nama Siswa', 'NIS', ...daysHeader.map(d => String(d)), 'H', 'T', 'S', 'I', 'A'];
+        
+        const dataRows = studentData.map(row => ([
+            row.student.name,
+            row.student.nis,
+            ...daysHeader.map(day => row.statuses[day] || ''),
+            row.summary.H || 0,
+            row.summary.T || 0,
+            row.summary.S || 0,
+            row.summary.I || 0,
+            row.summary.A || 0,
+        ]));
+
+        const finalSheetData = [
+            [title],
+            [periodInfo],
+            [],
+            headers,
+            ...dataRows,
+        ];
+
+        const worksheet = XLSX.utils.aoa_to_sheet(finalSheetData);
+        
+        worksheet['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: headers.length - 1 } },
+        ];
+
+        const columnWidths = [
+          { wch: 30 },
+          { wch: 15 },
+          ...daysHeader.map(() => ({ wch: 4 })),
+          { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 }
+        ];
+        worksheet['!cols'] = columnWidths;
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `Laporan Absensi`);
+
+        XLSX.writeFile(workbook, `laporan_absensi_${month}.xlsx`);
     }
     
     const getStatusCell = (statusKey: StatusKey | undefined) => {

@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Student } from '../../types';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUpload, FiDownload, FiX, FiSave, FiAlertCircle } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUpload, FiDownload, FiX, FiSave, FiAlertCircle, FiChevronUp, FiChevronDown, FiBarChart2 } from 'react-icons/fi';
 import * as XLSX from 'xlsx';
+
+declare const Swal: any;
 
 // --- Student Modal Component (Add/Edit) ---
 const StudentModal: React.FC<{
@@ -43,19 +44,19 @@ const StudentModal: React.FC<{
     e.preventDefault();
     const { nis, name, classId } = formData;
     if (!nis.trim() || !name.trim() || !classId) {
-      toast.error('NIS, Nama, dan Kelas wajib diisi.');
+      Swal.fire('Error', 'NIS, Nama, dan Kelas wajib diisi.', 'error');
       return;
     }
 
     const isDuplicateNis = students.some(s => s.nis === nis && s.id !== student?.id);
     if (isDuplicateNis) {
-      toast.error('NIS sudah digunakan oleh siswa lain.');
+      Swal.fire('Error', 'NIS sudah digunakan oleh siswa lain.', 'error');
       return;
     }
     if (formData.rfidUid) {
       const isDuplicateRfid = students.some(s => s.rfidUid === formData.rfidUid && s.id !== student?.id);
       if (isDuplicateRfid) {
-        toast.error('RFID UID sudah digunakan oleh siswa lain.');
+        Swal.fire('Error', 'RFID UID sudah digunakan oleh siswa lain.', 'error');
         return;
       }
     }
@@ -149,13 +150,13 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
       const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
       if (jsonData.length === 0) {
-        toast.error("File Excel kosong atau tidak ada data.");
+        Swal.fire('Error', "File Excel kosong atau tidak ada data.", 'error');
         return;
       }
       const header = Object.keys(jsonData[0]);
       const requiredHeaders = ['nis', 'name', 'className'];
       if (!requiredHeaders.every(h => header.includes(h))) {
-          toast.error(`Header Excel tidak valid. Pastikan ada kolom: ${requiredHeaders.join(', ')}`);
+          Swal.fire('Error', `Header Excel tidak valid. Pastikan ada kolom: ${requiredHeaders.join(', ')}`, 'error');
           return;
       }
       
@@ -186,7 +187,7 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
       setParsedData(validatedData);
     } catch (error) {
       console.error("Error parsing Excel file:", error);
-      toast.error("Gagal memproses file Excel. Pastikan formatnya benar.");
+      Swal.fire('Error', "Gagal memproses file Excel. Pastikan formatnya benar.", 'error');
     }
   };
 
@@ -197,7 +198,7 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
         const fileExtension = '.' + selectedFile.name.split('.').pop()?.toLowerCase();
         
         if (!allowedExtensions.includes(fileExtension)) {
-            toast.error("Hanya file .xls atau .xlsx yang diizinkan.");
+            Swal.fire('Error', "Hanya file .xls atau .xlsx yang diizinkan.", 'error');
             return;
         }
       setFile(selectedFile);
@@ -209,14 +210,14 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
 
   const handleImport = async () => {
       const validData = parsedData.filter(row => row.isValid);
-      if (validData.length === 0) { toast.error("Tidak ada data valid untuk diimpor."); return; }
+      if (validData.length === 0) { Swal.fire('Info', "Tidak ada data valid untuk diimpor.", 'info'); return; }
       setIsProcessing(true);
       const classMap = new Map(classes.map(c => [c.name.toLowerCase(), c.id]));
       const newStudentsData: Omit<Student, 'id' | 'photoUrl'>[] = validData.map(row => ({
           nis: row.data.nis, name: row.data.name, classId: classMap.get(row.data.className.toLowerCase())!,
           rfidUid: row.data.rfidUid
       }));
-      try { await addStudentsBatch(newStudentsData); onClose(); } catch (err) { toast.error("Terjadi kesalahan saat mengimpor."); } finally { setIsProcessing(false); }
+      try { await addStudentsBatch(newStudentsData); onClose(); } catch (err) { Swal.fire('Error', "Terjadi kesalahan saat mengimpor.", 'error'); } finally { setIsProcessing(false); }
   };
   
   const validRowCount = parsedData.filter(row => row.isValid).length;
@@ -280,6 +281,8 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
 };
 
 // --- Main Students Page Component ---
+type SortableKeys = keyof Pick<Student, 'nis' | 'name' | 'rfidUid'> | 'className';
+
 const StudentsPage: React.FC = () => {
   const { students, classes, loading, addStudent, updateStudent, deleteStudent, deleteStudentsBatch } = useData();
   const [searchTerm, setSearchTerm] = useState('');
@@ -288,6 +291,9 @@ const StudentsPage: React.FC = () => {
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
+
+  const getClassName = (classId: string) => { return classes.find(c => c.id === classId)?.name || 'N/A'; }
 
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
@@ -296,13 +302,49 @@ const StudentsPage: React.FC = () => {
       return matchesSearch && matchesClass;
     });
   }, [students, searchTerm, filterClass]);
+
+  const sortedStudents = useMemo(() => {
+    let sortableItems = [...filteredStudents];
+    if (sortConfig !== null) {
+        sortableItems.sort((a, b) => {
+            let aValue: string | number;
+            let bValue: string | number;
+
+            if (sortConfig.key === 'className') {
+                aValue = getClassName(a.classId);
+                bValue = getClassName(b.classId);
+            } else {
+                aValue = a[sortConfig.key] || ''; // Use empty string for null/undefined rfidUid
+                bValue = b[sortConfig.key] || '';
+            }
+
+            const strA = String(aValue).toLowerCase();
+            const strB = String(bValue).toLowerCase();
+
+            if (strA < strB) {
+                return sortConfig.direction === 'ascending' ? -1 : 1;
+            }
+            if (strA > strB) {
+                return sortConfig.direction === 'ascending' ? 1 : -1;
+            }
+            return 0;
+        });
+    }
+    return sortableItems;
+  }, [filteredStudents, sortConfig, classes]);
   
   // Clear selection when filters change
   useEffect(() => {
     setSelectedIds(new Set());
   }, [searchTerm, filterClass]);
 
-  const getClassName = (classId: string) => { return classes.find(c => c.id === classId)?.name || 'N/A'; }
+  const requestSort = (key: SortableKeys) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
   
   const handleOpenStudentModal = (student: Student | null) => { setSelectedStudent(student); setIsStudentModalOpen(true); };
   const handleCloseStudentModal = () => { setSelectedStudent(null); setIsStudentModalOpen(false); };
@@ -312,15 +354,26 @@ const StudentsPage: React.FC = () => {
     handleCloseStudentModal();
   };
   
-  const handleDeleteStudent = async (student: Student) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus siswa "${student.name}"?`)) {
-        try {
-            await deleteStudent(student.id);
-        } catch (error) {
-            toast.error("Gagal menghapus siswa.");
-            console.error("Error deleting student:", error);
+  const handleDeleteStudent = (student: Student) => {
+    Swal.fire({
+        title: 'Apakah Anda yakin?',
+        text: `Anda akan menghapus siswa "${student.name}". Aksi ini tidak dapat dibatalkan.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Ya, hapus!',
+        cancelButtonText: 'Batal'
+    }).then(async (result: { isConfirmed: boolean }) => {
+        if (result.isConfirmed) {
+            try {
+                await deleteStudent(student.id);
+            } catch (error) {
+                Swal.fire('Gagal!', 'Gagal menghapus siswa.', 'error');
+                console.error("Error deleting student:", error);
+            }
         }
-    }
+    });
   };
 
   const handleSelectOne = (id: string) => {
@@ -336,26 +389,55 @@ const StudentsPage: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.size === filteredStudents.length) {
+    if (selectedIds.size === sortedStudents.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredStudents.map(s => s.id)));
+      setSelectedIds(new Set(sortedStudents.map(s => s.id)));
     }
   };
   
-  const handleDeleteSelected = async () => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.size} siswa terpilih?`)) {
-      try {
-        await deleteStudentsBatch(Array.from(selectedIds));
-        setSelectedIds(new Set());
-      } catch (error) {
-        toast.error("Gagal menghapus siswa terpilih.");
-        console.error("Error deleting students batch:", error);
-      }
-    }
+  const handleDeleteSelected = () => {
+    Swal.fire({
+        title: 'Apakah Anda yakin?',
+        text: `Anda akan menghapus ${selectedIds.size} siswa terpilih. Aksi ini tidak dapat dibatalkan.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Ya, hapus!',
+        cancelButtonText: 'Batal'
+    }).then(async (result: { isConfirmed: boolean }) => {
+        if (result.isConfirmed) {
+            try {
+                await deleteStudentsBatch(Array.from(selectedIds));
+                setSelectedIds(new Set());
+            } catch (error) {
+                Swal.fire('Gagal!', 'Gagal menghapus siswa terpilih.', 'error');
+                console.error("Error deleting students batch:", error);
+            }
+        }
+    });
   };
 
-  const isAllSelected = selectedIds.size > 0 && selectedIds.size === filteredStudents.length;
+  const isAllSelected = selectedIds.size > 0 && selectedIds.size === sortedStudents.length;
+
+  const SortableHeader: React.FC<{ columnKey: SortableKeys, title: string }> = ({ columnKey, title }) => {
+    const isSorted = sortConfig?.key === columnKey;
+    return (
+      <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">
+        <button onClick={() => requestSort(columnKey)} className="flex items-center gap-2 group transition-colors hover:text-indigo-600">
+          <span>{title}</span>
+          {isSorted ? (
+            sortConfig.direction === 'ascending' ? 
+            <FiChevronUp size={16} className="text-indigo-600" /> : 
+            <FiChevronDown size={16} className="text-indigo-600" />
+          ) : (
+            <FiBarChart2 size={16} className="text-slate-400 opacity-0 group-hover:opacity-100" />
+          )}
+        </button>
+      </th>
+    );
+  };
 
   return (
     <div>
@@ -419,17 +501,17 @@ const StudentsPage: React.FC = () => {
                       onChange={handleSelectAll}
                     />
                 </th>
-                <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Siswa</th>
-                <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">NIS</th>
-                <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Kelas</th>
-                <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">RFID UID</th>
+                <SortableHeader columnKey="name" title="Siswa" />
+                <SortableHeader columnKey="nis" title="NIS" />
+                <SortableHeader columnKey="className" title="Kelas" />
+                <SortableHeader columnKey="rfidUid" title="RFID UID" />
                 <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr><td colSpan={6} className="text-center p-4">Memuat data...</td></tr>
-              ) : filteredStudents.length > 0 ? filteredStudents.map(student => (
+              ) : sortedStudents.length > 0 ? sortedStudents.map(student => (
                 <tr key={student.id} className={`border-b border-slate-100 ${selectedIds.has(student.id) ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
                    <td className="p-4 text-center">
                     <input type="checkbox"

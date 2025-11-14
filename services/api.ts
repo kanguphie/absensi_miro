@@ -47,13 +47,13 @@ let students: Student[] = [
 ];
 
 let classes: SchoolClass[] = [
-  { id: 'c1a', name: 'Kelas 1A' },
-  { id: 'c1b', name: 'Kelas 1B' },
-  { id: 'c2a', name: 'Kelas 2A' },
-  { id: 'c3', name: 'Kelas 3' },
-  { id: 'c4', name: 'Kelas 4' },
-  { id: 'c5', name: 'Kelas 5' },
-  { id: 'c6', name: 'Kelas 6' },
+  { id: 'c1a', name: '1A' },
+  { id: 'c1b', name: '1B' },
+  { id: 'c2a', name: '2A' },
+  { id: 'c3', name: '3' },
+  { id: 'c4', name: '4' },
+  { id: 'c5', name: '5' },
+  { id: 'c6', name: '6' },
 ];
 
 let attendanceLogs: AttendanceLog[] = [];
@@ -317,6 +317,7 @@ export const api = {
       await simulateDelay();
       const initialLength = students.length;
       students = students.filter(s => s.id !== studentId);
+      attendanceLogs = attendanceLogs.filter(log => log.studentId !== studentId);
       return students.length < initialLength;
   },
 
@@ -324,6 +325,7 @@ export const api = {
     await simulateDelay();
     const initialLength = students.length;
     students = students.filter(s => !studentIds.includes(s.id));
+    attendanceLogs = attendanceLogs.filter(log => !studentIds.includes(log.studentId));
     return students.length < initialLength;
   },
   
@@ -402,6 +404,37 @@ export const api = {
       return { success: false, message: 'NIS tidak ditemukan' };
     }
     return _internalRecordAttendance(student);
+  },
+
+  markAttendanceManually: async (studentId: string, status: AttendanceStatus, date: string): Promise<AttendanceLog | null> => {
+    await simulateDelay(200);
+    const student = students.find(s => s.id === studentId);
+    if (!student) return null;
+
+    const logDate = new Date(date + 'T00:00:00'); // Set to start of day
+    const logDateString = toLocalISOString(logDate);
+
+    // Remove any existing log for this student on this day to prevent conflicts
+    attendanceLogs = attendanceLogs.filter(log => !(log.studentId === studentId && toLocalISOString(new Date(log.timestamp)) === logDateString));
+    
+    // Use a fixed time for manual entries, e.g., 7 AM
+    const timestamp = new Date(date + 'T07:00:00');
+
+    const newLog: AttendanceLog = {
+        id: `log-manual-${student.id}-${Date.now()}`,
+        studentId: student.id,
+        studentName: student.name,
+        studentPhotoUrl: student.photoUrl,
+        className: classes.find(c => c.id === student.classId)?.name || '',
+        timestamp: timestamp,
+        type: 'in', // Manual entries count as a form of check-in
+        status: status,
+    };
+
+    attendanceLogs.unshift(newLog); // Add to the top
+    attendanceLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()); // Re-sort
+    
+    return JSON.parse(JSON.stringify(newLog));
   },
 
   login: async (username: string, password: string):Promise<{success: boolean; user?: User, token?: string}> => {

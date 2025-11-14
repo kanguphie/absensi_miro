@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { FiUsers, FiClock, FiAlertTriangle, FiUserCheck, FiTrendingUp } from 'react-icons/fi';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useData } from '../../contexts/DataContext';
-import { AttendanceLog, AttendanceStatus } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { AttendanceStatus } from '../../types';
 
 const StatCard: React.FC<{ icon: React.ReactElement; title: string; value: string | number; gradientColor: string; }> = ({ icon, title, value, gradientColor }) => (
   <div className={`relative overflow-hidden text-white p-5 rounded-xl shadow-lg transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-2xl ${gradientColor}`}>
@@ -17,6 +18,7 @@ const StatCard: React.FC<{ icon: React.ReactElement; title: string; value: strin
 
 const DashboardPage: React.FC = () => {
     const { students, attendanceLogs } = useData();
+    const { user } = useAuth();
 
     const todayStats = useMemo(() => {
         const today = new Date().toDateString();
@@ -59,7 +61,10 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-3xl font-bold text-slate-800 mb-6">Dashboard</h1>
+       <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 mb-6">
+        <h1 className="text-3xl font-bold text-slate-800">Selamat Datang, {user?.username}!</h1>
+        <p className="mt-1 text-slate-600">Ini adalah panel admin untuk Sistem Absensi RFID.</p>
+      </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard icon={<FiUsers />} title="Total Siswa" value={todayStats.total} gradientColor="bg-gradient-to-br from-indigo-500 to-blue-500" />

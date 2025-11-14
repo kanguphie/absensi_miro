@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import toast from 'react-hot-toast';
 import { FiActivity, FiArrowRight, FiEdit } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 
@@ -7,7 +6,8 @@ import { useData } from '../contexts/DataContext';
 import { useSettings } from '../contexts/SettingsContext';
 import Clock from '../components/Clock';
 import Spinner from '../components/ui/Spinner';
-import AttendanceToast from '../components/AttendanceToast';
+
+declare const Swal: any;
 
 const playNotificationSound = (context: AudioContext, success: boolean) => {
   const oscillator = context.createOscillator();
@@ -63,23 +63,64 @@ const KioskPage: React.FC = () => {
     try {
       const result = await recordAttendance(uid);
       if (result.success && result.log) {
-        toast.custom(t => <AttendanceToast log={result.log!} message={result.message} />, { id: result.log.id, duration: 6000 });
+        const statusColor = result.log.status === 'Tepat Waktu' ? '#22c55e' : 
+                            result.log.status === 'Terlambat' ? '#f59e0b' :
+                            '#3b82f6';
+
+        Swal.fire({
+          html: `
+            <div style="display: flex; align-items: flex-start; text-align: left;">
+              <img src="${result.log.studentPhotoUrl}" alt="${result.log.studentName}" style="width: 64px; height: 64px; border-radius: 9999px; object-fit: cover; margin-right: 16px; border: 2px solid rgba(255,255,255,0.5);" />
+              <div style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <p style="font-weight: bold; font-size: 1.125rem; color: #1f2937; margin:0;">${result.log.studentName}</p>
+                  <span style="padding: 4px 8px; font-size: 0.75rem; font-weight: 600; color: white; border-radius: 9999px; background-color: ${statusColor};">
+                    ${result.log.status}
+                  </span>
+                </div>
+                <p style="color: #4b5563; margin: 0;">${result.log.className}</p>
+                <p style="color: #6b7280; font-size: 0.875rem; margin-top: 4px;">${result.message}</p>
+              </div>
+            </div>
+          `,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 6000,
+          timerProgressBar: true,
+          toast: true,
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdrop: 'none',
+          customClass: {
+            popup: 'swal2-backdrop-blur'
+          },
+          didOpen: (toastEl: HTMLElement) => {
+            toastEl.addEventListener('mouseenter', Swal.stopTimer)
+            toastEl.addEventListener('mouseleave', Swal.resumeTimer)
+          }
+        });
         playNotificationSound(audioContext, true);
       } else {
-        toast.error(
-          <div className="flex items-center">
-            <span>{result.message}</span>
-          </div>,
-          { duration: 4000 }
-        );
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: result.message,
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 4000
+        });
         playNotificationSound(audioContext, false);
       }
     } catch (error) {
-      toast.error(
-        <div className="flex items-center">
-          <span>Koneksi Gagal. Coba lagi.</span>
-        </div>
-      );
+       Swal.fire({
+          icon: 'error',
+          title: 'Koneksi Gagal',
+          text: 'Silakan coba lagi.',
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 4000
+        });
     } finally {
       setIsProcessing(false);
       setRfid('');

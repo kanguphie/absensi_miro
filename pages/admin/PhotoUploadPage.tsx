@@ -3,7 +3,8 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Student } from '../../types';
 import { FiUploadCloud, FiCheckCircle, FiXCircle, FiUpload, FiTrash2, FiLoader } from 'react-icons/fi';
-import toast from 'react-hot-toast';
+
+declare const Swal: any;
 
 type PhotoStatus = 'matched' | 'unmatched' | 'uploading' | 'uploaded' | 'error';
 
@@ -81,12 +82,19 @@ const PhotoUploadPage: React.FC = () => {
     const handleUpload = async () => {
         const filesToUpload = photoFiles.filter(pf => pf.status === 'matched');
         if (filesToUpload.length === 0) {
-            toast.error("Tidak ada foto yang valid untuk diunggah.");
+            Swal.fire('Info', "Tidak ada foto yang valid untuk diunggah.", 'info');
             return;
         }
 
         setIsUploading(true);
-        toast.loading(`Mengunggah ${filesToUpload.length} foto...`, { id: 'upload-toast' });
+        Swal.fire({
+            title: 'Mengunggah...',
+            text: `Memproses ${filesToUpload.length} foto.`,
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
 
         const uploadPromises = filesToUpload.map(async (photoFile) => {
             setPhotoFiles(prev => prev.map(pf => pf.id === photoFile.id ? { ...pf, status: 'uploading' } : pf));
@@ -108,8 +116,8 @@ const PhotoUploadPage: React.FC = () => {
         await refetchData();
         
         setIsUploading(false);
-        toast.dismiss('upload-toast');
-        toast.success(`${successfulUploads} dari ${filesToUpload.length} foto berhasil diunggah!`);
+        Swal.close();
+        Swal.fire('Berhasil!', `${successfulUploads} dari ${filesToUpload.length} foto berhasil diunggah!`, 'success');
     };
 
     const { matchedCount, unmatchedCount } = useMemo(() => ({

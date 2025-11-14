@@ -75,6 +75,15 @@
       .animate-fade-in {
         animation: fadeIn 0.5s ease-out forwards;
       }
+      
+      /* Custom styling for SweetAlert2 kiosk toast */
+      .swal2-toast.swal2-popup.swal2-backdrop-blur {
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border-radius: 1rem;
+          box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+      }
     </style>
   <script type="importmap">
 {
@@ -83,16 +92,16 @@
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
-    "react-hot-toast": "https://aistudiocdn.com/react-hot-toast@^2.6.0",
     "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
     "react-icons/": "https://aistudiocdn.com/react-icons@^5.5.0/",
-    "xlsx": "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+    "xlsx": "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/xlsx.mjs"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

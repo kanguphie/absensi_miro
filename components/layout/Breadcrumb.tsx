@@ -9,6 +9,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/admin/students': 'Manajemen Siswa',
   '/admin/classes': 'Manajemen Kelas',
   '/admin/photo-upload': 'Unggah Foto Massal',
+  '/admin/attendance-management': 'Manajemen Absensi',
   '/admin/reports': 'Laporan Bulanan',
   '/admin/daily-reports': 'Laporan Harian',
   '/admin/periodic-reports': 'Laporan Periodik',

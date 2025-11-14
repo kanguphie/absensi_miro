@@ -19,6 +19,7 @@ import {
   FiCalendar,
   FiActivity,
   FiImage,
+  FiUserX,
 } from 'react-icons/fi';
 import Breadcrumb from './Breadcrumb';
 
@@ -43,6 +44,7 @@ const AdminLayout: React.FC = () => {
         { name: 'Manajemen Siswa', path: '/admin/students', icon: FiUsers },
         { name: 'Manajemen Kelas', path: '/admin/classes', icon: FiArchive },
         { name: 'Unggah Foto', path: '/admin/photo-upload', icon: FiImage },
+        { name: 'Manajemen Absensi', path: '/admin/attendance-management', icon: FiUserX },
       ],
     },
     { 

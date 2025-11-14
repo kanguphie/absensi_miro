@@ -1,7 +1,8 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
-import { Student, SchoolClass, AttendanceLog } from '../types';
+import { Student, SchoolClass, AttendanceLog, AttendanceStatus } from '../types';
 import { api } from '../services/api';
-import toast from 'react-hot-toast';
+
+declare const Swal: any;
 
 interface DataContextType {
   students: Student[];
@@ -22,6 +23,8 @@ interface DataContextType {
   addClass: (name: string) => Promise<void>;
   updateClass: (id: string, name: string) => Promise<void>;
   deleteClass: (id: string) => Promise<void>;
+  // Attendance Management
+  markAttendance: (studentId: string, status: AttendanceStatus, date: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -45,7 +48,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setAttendanceLogs(logsData);
     } catch (error) {
       console.error("Failed to fetch data", error);
-      toast.error("Gagal memuat data dari server.");
+      Swal.fire('Error', 'Gagal memuat data dari server.', 'error');
     } finally {
       setLoading(false);
     }
@@ -79,13 +82,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addStudent = useCallback(async (studentData: Omit<Student, 'id' | 'photoUrl'>) => {
     await api.addStudent(studentData);
-    toast.success(`Siswa "${studentData.name}" berhasil ditambahkan.`);
+    Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: `Siswa "${studentData.name}" berhasil ditambahkan.`,
+        timer: 2000,
+        showConfirmButton: false
+    });
     fetchData();
   }, [fetchData]);
 
   const updateStudent = useCallback(async (studentId: string, studentData: Partial<Omit<Student, 'id'| 'photoUrl'>>) => {
     await api.updateStudent(studentId, studentData);
-    toast.success(`Data siswa berhasil diperbarui.`);
+    Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: `Data siswa berhasil diperbarui.`,
+        timer: 2000,
+        showConfirmButton: false
+    });
     fetchData();
   }, [fetchData]);
   
@@ -98,32 +113,44 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const deleteStudent = useCallback(async (studentId: string) => {
     const success = await api.deleteStudent(studentId);
     if (success) {
-      toast.success("Siswa berhasil dihapus.");
-      setStudents(prevStudents => prevStudents.filter(s => s.id !== studentId));
+      Swal.fire('Dihapus!', 'Siswa berhasil dihapus.', 'success');
+      fetchData();
     } else {
-      toast.error("Gagal menghapus siswa.");
+      Swal.fire('Gagal!', 'Gagal menghapus siswa.', 'error');
     }
-  }, []);
+  }, [fetchData]);
 
   const deleteStudentsBatch = useCallback(async (studentIds: string[]) => {
     const success = await api.deleteStudentsBatch(studentIds);
     if (success) {
-      toast.success(`${studentIds.length} siswa berhasil dihapus.`);
-      setStudents(prevStudents => prevStudents.filter(s => !studentIds.includes(s.id)));
+      Swal.fire('Dihapus!', `${studentIds.length} siswa berhasil dihapus.`, 'success');
+      fetchData();
     } else {
-      toast.error("Gagal menghapus siswa.");
+      Swal.fire('Gagal!', 'Gagal menghapus siswa.', 'error');
     }
-  }, []);
+  }, [fetchData]);
 
   const addClass = useCallback(async (name: string) => {
       await api.addClass(name);
-      toast.success(`Kelas "${name}" berhasil ditambahkan.`);
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: `Kelas "${name}" berhasil ditambahkan.`,
+        timer: 2000,
+        showConfirmButton: false
+    });
       fetchData();
   }, [fetchData]);
 
   const updateClass = useCallback(async (id: string, name: string) => {
       await api.updateClass(id, name);
-      toast.success(`Kelas berhasil diperbarui.`);
+      Swal.fire({
+        icon: 'success',
+        title: 'Berhasil!',
+        text: `Kelas berhasil diperbarui.`,
+        timer: 2000,
+        showConfirmButton: false
+    });
       fetchData();
   }, [fetchData]);
 
@@ -131,31 +158,40 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Check if any student is in this class
       const isClassInUse = students.some(s => s.classId === id);
       if (isClassInUse) {
-          toast.error("Tidak dapat menghapus kelas karena masih ada siswa di dalamnya.");
+          Swal.fire('Gagal!', 'Tidak dapat menghapus kelas karena masih ada siswa di dalamnya.', 'error');
           return;
       }
       const success = await api.deleteClass(id);
       if (success) {
-          toast.success("Kelas berhasil dihapus.");
+          Swal.fire('Dihapus!', 'Kelas berhasil dihapus.', 'success');
           fetchData();
       } else {
-          toast.error("Gagal menghapus kelas.");
+          Swal.fire('Gagal!', 'Gagal menghapus kelas.', 'error');
       }
   }, [students, fetchData]);
   
   const addStudentsBatch = useCallback(async (newStudents: Omit<Student, 'id' | 'photoUrl'>[]) => {
       const result = await api.addStudentsBatch(newStudents);
       if (result.success) {
-          toast.success(`${result.added} siswa berhasil diimpor.`);
+          Swal.fire('Berhasil!', `${result.added} siswa berhasil diimpor.`, 'success');
           fetchData();
       } else {
-          toast.error("Gagal mengimpor data siswa.");
+          Swal.fire('Gagal!', 'Gagal mengimpor data siswa.', 'error');
       }
   }, [fetchData]);
 
+  const markAttendance = useCallback(async (studentId: string, status: AttendanceStatus, date: string) => {
+    const result = await api.markAttendanceManually(studentId, status, date);
+    if (result) {
+        Swal.fire('Berhasil!', `Status kehadiran siswa telah diperbarui menjadi "${status}".`, 'success');
+        fetchData(); // Refetch all data
+    } else {
+        Swal.fire('Gagal!', 'Gagal memperbarui status kehadiran.', 'error');
+    }
+  }, [fetchData]);
 
   return (
-    <DataContext.Provider value={{ students, classes, attendanceLogs, loading, recordAttendance, recordAttendanceByNis, refetchData, addStudent, updateStudent, updateStudentPhoto, deleteStudent, deleteStudentsBatch, addStudentsBatch, addClass, updateClass, deleteClass }}>
+    <DataContext.Provider value={{ students, classes, attendanceLogs, loading, recordAttendance, recordAttendanceByNis, refetchData, addStudent, updateStudent, updateStudentPhoto, deleteStudent, deleteStudentsBatch, addStudentsBatch, addClass, updateClass, deleteClass, markAttendance }}>
       {children}
     </DataContext.Provider>
   );
