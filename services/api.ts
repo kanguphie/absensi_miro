@@ -303,11 +303,28 @@ export const api = {
       return null;
   },
 
+  updateStudentPhoto: async (studentId: string, photoDataUrl: string): Promise<Student | null> => {
+    await simulateDelay(100);
+    const studentIndex = students.findIndex(s => s.id === studentId);
+    if (studentIndex > -1) {
+        students[studentIndex].photoUrl = photoDataUrl;
+        return JSON.parse(JSON.stringify(students[studentIndex]));
+    }
+    return null;
+  },
+
   deleteStudent: async (studentId: string): Promise<boolean> => {
       await simulateDelay();
       const initialLength = students.length;
       students = students.filter(s => s.id !== studentId);
       return students.length < initialLength;
+  },
+
+  deleteStudentsBatch: async (studentIds: string[]): Promise<boolean> => {
+    await simulateDelay();
+    const initialLength = students.length;
+    students = students.filter(s => !studentIds.includes(s.id));
+    return students.length < initialLength;
   },
   
   addStudentsBatch: async (newStudentsData: Omit<Student, 'id' | 'photoUrl'>[]): Promise<{success: boolean; added: number}> => {

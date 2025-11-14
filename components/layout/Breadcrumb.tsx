@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { FiChevronRight, FiHome } from 'react-icons/fi';
@@ -7,8 +8,10 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/admin/dashboard': 'Dashboard',
   '/admin/students': 'Manajemen Siswa',
   '/admin/classes': 'Manajemen Kelas',
+  '/admin/photo-upload': 'Unggah Foto Massal',
   '/admin/reports': 'Laporan Bulanan',
   '/admin/daily-reports': 'Laporan Harian',
+  '/admin/periodic-reports': 'Laporan Periodik',
   '/admin/settings': 'Pengaturan',
 };
 

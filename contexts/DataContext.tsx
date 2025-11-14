@@ -14,7 +14,9 @@ interface DataContextType {
   // Student CRUD
   addStudent: (studentData: Omit<Student, 'id' | 'photoUrl'>) => Promise<void>;
   updateStudent: (studentId: string, studentData: Partial<Omit<Student, 'id'| 'photoUrl'>>) => Promise<void>;
+  updateStudentPhoto: (studentId: string, photoDataUrl: string) => Promise<void>;
   deleteStudent: (studentId: string) => Promise<void>;
+  deleteStudentsBatch: (studentIds: string[]) => Promise<void>;
   addStudentsBatch: (newStudents: Omit<Student, 'id' | 'photoUrl'>[]) => Promise<void>;
   // Class CRUD
   addClass: (name: string) => Promise<void>;
@@ -86,16 +88,32 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     toast.success(`Data siswa berhasil diperbarui.`);
     fetchData();
   }, [fetchData]);
+  
+  const updateStudentPhoto = useCallback(async (studentId: string, photoDataUrl: string) => {
+      await api.updateStudentPhoto(studentId, photoDataUrl);
+      // No toast here to prevent spam during batch uploads.
+      // No refetch here to prevent performance issues. The calling component should refetch once.
+  }, []);
 
   const deleteStudent = useCallback(async (studentId: string) => {
     const success = await api.deleteStudent(studentId);
     if (success) {
       toast.success("Siswa berhasil dihapus.");
-      fetchData();
+      setStudents(prevStudents => prevStudents.filter(s => s.id !== studentId));
     } else {
       toast.error("Gagal menghapus siswa.");
     }
-  }, [fetchData]);
+  }, []);
+
+  const deleteStudentsBatch = useCallback(async (studentIds: string[]) => {
+    const success = await api.deleteStudentsBatch(studentIds);
+    if (success) {
+      toast.success(`${studentIds.length} siswa berhasil dihapus.`);
+      setStudents(prevStudents => prevStudents.filter(s => !studentIds.includes(s.id)));
+    } else {
+      toast.error("Gagal menghapus siswa.");
+    }
+  }, []);
 
   const addClass = useCallback(async (name: string) => {
       await api.addClass(name);
@@ -137,7 +155,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
   return (
-    <DataContext.Provider value={{ students, classes, attendanceLogs, loading, recordAttendance, recordAttendanceByNis, refetchData, addStudent, updateStudent, deleteStudent, addStudentsBatch, addClass, updateClass, deleteClass }}>
+    <DataContext.Provider value={{ students, classes, attendanceLogs, loading, recordAttendance, recordAttendanceByNis, refetchData, addStudent, updateStudent, updateStudentPhoto, deleteStudent, deleteStudentsBatch, addStudentsBatch, addClass, updateClass, deleteClass }}>
       {children}
     </DataContext.Provider>
   );

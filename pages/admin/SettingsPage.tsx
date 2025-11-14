@@ -86,30 +86,30 @@ const SettingsPage: React.FC = () => {
                     <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity ${!op.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
                         {/* Jam Masuk */}
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Jam Masuk</label>
-                            <input type="time" value={op.checkInTime} onChange={e => handleHoursChange(op.dayGroup, 'checkInTime', e.target.value)} disabled={!op.enabled} className="w-full text-sm py-2 px-3 border-slate-300 rounded-md shadow-sm disabled:bg-slate-200"/>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Jam Masuk</label>
+                            <input type="time" value={op.checkInTime} onChange={e => handleHoursChange(op.dayGroup, 'checkInTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Toleransi Telat (menit)</label>
-                            <input type="number" value={op.lateTolerance} onChange={e => handleHoursChange(op.dayGroup, 'lateTolerance', e.target.value)} disabled={!op.enabled} className="w-full text-sm py-2 px-3 border-slate-300 rounded-md shadow-sm disabled:bg-slate-200"/>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Toleransi Telat (menit)</label>
+                            <input type="number" value={op.lateTolerance} onChange={e => handleHoursChange(op.dayGroup, 'lateTolerance', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-slate-600 mb-1">Bisa Scan Masuk (menit sebelum)</label>
-                          <input type="number" value={op.scanInBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanInBefore', e.target.value)} disabled={!op.enabled} className="w-full text-sm py-2 px-3 border-slate-300 rounded-md shadow-sm disabled:bg-slate-200"/>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Bisa Scan Masuk (menit sebelum)</label>
+                          <input type="number" value={op.scanInBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanInBefore', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
                         </div>
 
                         {/* Jam Pulang */}
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Jam Pulang</label>
-                            <input type="time" value={op.checkOutTime} onChange={e => handleHoursChange(op.dayGroup, 'checkOutTime', e.target.value)} disabled={!op.enabled} className="w-full text-sm py-2 px-3 border-slate-300 rounded-md shadow-sm disabled:bg-slate-200"/>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Jam Pulang</label>
+                            <input type="time" value={op.checkOutTime} onChange={e => handleHoursChange(op.dayGroup, 'checkOutTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Bisa Scan Pulang (menit sebelum)</label>
-                            <input type="number" value={op.scanOutBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanOutBefore', e.target.value)} disabled={!op.enabled} className="w-full text-sm py-2 px-3 border-slate-300 rounded-md shadow-sm disabled:bg-slate-200"/>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Bisa Scan Pulang (menit sebelum)</label>
+                            <input type="number" value={op.scanOutBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanOutBefore', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Batas Akhir Scan Pulang</label>
-                            <input type="time" value={op.scanOutEndTime} onChange={e => handleHoursChange(op.dayGroup, 'scanOutEndTime', e.target.value)} disabled={!op.enabled} className="w-full text-sm py-2 px-3 border-slate-300 rounded-md shadow-sm disabled:bg-slate-200"/>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Batas Akhir Scan Pulang</label>
+                            <input type="time" value={op.scanOutEndTime} onChange={e => handleHoursChange(op.dayGroup, 'scanOutEndTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
                         </div>
 
                     </div>

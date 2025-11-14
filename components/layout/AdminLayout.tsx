@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,6 +17,8 @@ import {
   FiChevronUp,
   FiClipboard,
   FiCalendar,
+  FiActivity,
+  FiImage,
 } from 'react-icons/fi';
 import Breadcrumb from './Breadcrumb';
 
@@ -39,6 +42,7 @@ const AdminLayout: React.FC = () => {
       children: [
         { name: 'Manajemen Siswa', path: '/admin/students', icon: FiUsers },
         { name: 'Manajemen Kelas', path: '/admin/classes', icon: FiArchive },
+        { name: 'Unggah Foto', path: '/admin/photo-upload', icon: FiImage },
       ],
     },
     { 
@@ -46,6 +50,7 @@ const AdminLayout: React.FC = () => {
       icon: FiFileText,
       children: [
           { name: 'Laporan Harian', path: '/admin/daily-reports', icon: FiClipboard },
+          { name: 'Laporan Periodik', path: '/admin/periodic-reports', icon: FiActivity },
           { name: 'Laporan Bulanan', path: '/admin/reports', icon: FiCalendar },
       ]
     },

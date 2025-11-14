@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Student } from '../../types';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUpload, FiDownload, FiX, FiSave } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiUpload, FiDownload, FiX, FiSave, FiAlertCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 // --- Student Modal Component (Add/Edit) ---
 const StudentModal: React.FC<{
@@ -123,70 +124,86 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleDownloadTemplate = () => {
-    const csvContent = "nis,name,className,rfidUid\n";
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", "template_import_siswa.csv");
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      ['nis', 'name', 'className', 'rfidUid']
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data Siswa");
+    
+    // Set column widths for better readability
+    worksheet['!cols'] = [
+        { wch: 15 }, // nis
+        { wch: 30 }, // name
+        { wch: 15 }, // className
+        { wch: 20 }  // rfidUid
+    ];
+
+    XLSX.writeFile(workbook, "template_import_siswa.xlsx");
   };
 
-  const processFile = (content: string) => {
-    const lines = content.replace(/\r/g, '').split('\n').filter(line => line.trim() !== '');
-    if (lines.length < 2) {
-      toast.error("File CSV kosong atau hanya berisi header.");
-      return;
-    }
-    const header = lines[0].split(',').map(h => h.trim());
-    const requiredHeaders = ['nis', 'name', 'className'];
-    if (!requiredHeaders.every(h => header.includes(h))) {
-        toast.error(`Header CSV tidak valid. Pastikan ada kolom: ${requiredHeaders.join(', ')}`);
+  const processFile = (data: ArrayBuffer) => {
+    try {
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      if (jsonData.length === 0) {
+        toast.error("File Excel kosong atau tidak ada data.");
         return;
+      }
+      const header = Object.keys(jsonData[0]);
+      const requiredHeaders = ['nis', 'name', 'className'];
+      if (!requiredHeaders.every(h => header.includes(h))) {
+          toast.error(`Header Excel tidak valid. Pastikan ada kolom: ${requiredHeaders.join(', ')}`);
+          return;
+      }
+      
+      const classMap = new Map(classes.map(c => [c.name.toLowerCase(), c.id]));
+      const existingNis = new Set(students.map(s => String(s.nis)));
+      const existingRfid = new Set(students.map(s => s.rfidUid).filter(Boolean));
+
+      const validatedData: StudentImportRow[] = jsonData.map(rowData => {
+        const errors: string[] = [];
+        const nis = String(rowData.nis || '').trim();
+        const name = String(rowData.name || '').trim();
+        const className = String(rowData.className || '').trim();
+        const rfidUid = String(rowData.rfidUid || '').trim();
+
+        if (!nis) errors.push("NIS wajib diisi.");
+        if (!name) errors.push("Nama wajib diisi.");
+        if (!className) errors.push("Nama Kelas wajib diisi.");
+        if (nis && existingNis.has(nis)) errors.push("NIS sudah terdaftar.");
+        if (rfidUid && existingRfid.has(rfidUid)) errors.push("RFID sudah terdaftar.");
+        if (className && !classMap.has(className.toLowerCase())) errors.push("Kelas tidak ditemukan.");
+
+        return {
+          data: { nis, name, className, rfidUid },
+          isValid: errors.length === 0,
+          errors: errors,
+        };
+      });
+      setParsedData(validatedData);
+    } catch (error) {
+      console.error("Error parsing Excel file:", error);
+      toast.error("Gagal memproses file Excel. Pastikan formatnya benar.");
     }
-
-    const dataRows = lines.slice(1);
-    const classMap = new Map(classes.map(c => [c.name.toLowerCase(), c.id]));
-    const existingNis = new Set(students.map(s => s.nis));
-    const existingRfid = new Set(students.map(s => s.rfidUid).filter(Boolean));
-
-    const validatedData: StudentImportRow[] = dataRows.map(line => {
-      const values = line.split(',');
-      const rowData = header.reduce((obj, h, i) => {
-        obj[h] = values[i] ? values[i].trim() : '';
-        return obj;
-      }, {} as any);
-
-      const errors: string[] = [];
-      if (!rowData.nis) errors.push("NIS wajib diisi.");
-      if (!rowData.name) errors.push("Nama wajib diisi.");
-      if (!rowData.className) errors.push("Nama Kelas wajib diisi.");
-      if (rowData.nis && existingNis.has(rowData.nis)) errors.push("NIS sudah terdaftar.");
-      if (rowData.rfidUid && existingRfid.has(rowData.rfidUid)) errors.push("RFID sudah terdaftar.");
-      if (rowData.className && !classMap.has(rowData.className.toLowerCase())) errors.push("Kelas tidak ditemukan.");
-
-      return {
-        data: { nis: rowData.nis || '', name: rowData.name || '', className: rowData.className || '', rfidUid: rowData.rfidUid || '' },
-        isValid: errors.length === 0,
-        errors: errors,
-      };
-    });
-    setParsedData(validatedData);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-        if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
-            toast.error("Hanya file .csv yang diizinkan."); return;
+        const allowedExtensions = ['.xls', '.xlsx'];
+        const fileExtension = '.' + selectedFile.name.split('.').pop()?.toLowerCase();
+        
+        if (!allowedExtensions.includes(fileExtension)) {
+            toast.error("Hanya file .xls atau .xlsx yang diizinkan.");
+            return;
         }
       setFile(selectedFile);
       const reader = new FileReader();
-      reader.onload = (event) => { processFile(event.target?.result as string); };
-      reader.readAsText(selectedFile);
+      reader.onload = (event) => { processFile(event.target?.result as ArrayBuffer); };
+      reader.readAsArrayBuffer(selectedFile);
     }
   };
 
@@ -215,9 +232,9 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
         <div className="p-6 flex-1 overflow-y-auto">
           <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
             <h3 className="font-semibold text-slate-700">Langkah 1: Unduh dan Isi Template</h3>
-            <p className="text-sm text-slate-500 mt-1 mb-3">Unduh template CSV, isi data siswa sesuai format, lalu unggah pada langkah 2. Pastikan nama kelas sesuai dengan yang ada di sistem.</p>
+            <p className="text-sm text-slate-500 mt-1 mb-3">Unduh template, isi data siswa, lalu unggah file Excel (.xls, .xlsx) pada langkah 2. Pastikan nama kelas sesuai dengan yang ada di sistem.</p>
             <button onClick={handleDownloadTemplate} className="bg-white border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg hover:bg-slate-100 flex items-center transition-colors text-sm">
-              <FiDownload className="mr-2" /> Unduh Template (.csv)
+              <FiDownload className="mr-2" /> Unduh Template (XLSX)
             </button>
           </div>
 
@@ -229,10 +246,10 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
                   <div className="space-y-1 text-center">
                     <FiUpload className="mx-auto h-12 w-12 text-slate-400" />
                     <div className="flex text-sm text-slate-600"><p className="pl-1">{file ? file.name : 'Pilih file atau seret ke sini'}</p></div>
-                    <p className="text-xs text-slate-500">Hanya file .CSV</p>
+                    <p className="text-xs text-slate-500">Hanya file .XLS atau .XLSX</p>
                   </div>
                 </div>
-                <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".csv" />
+                <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".xls,.xlsx" />
               </label>
             </div>
           </div>
@@ -264,12 +281,13 @@ const ImportModal: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
 
 // --- Main Students Page Component ---
 const StudentsPage: React.FC = () => {
-  const { students, classes, loading, addStudent, updateStudent, deleteStudent } = useData();
+  const { students, classes, loading, addStudent, updateStudent, deleteStudent, deleteStudentsBatch } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
@@ -279,6 +297,11 @@ const StudentsPage: React.FC = () => {
     });
   }, [students, searchTerm, filterClass]);
   
+  // Clear selection when filters change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [searchTerm, filterClass]);
+
   const getClassName = (classId: string) => { return classes.find(c => c.id === classId)?.name || 'N/A'; }
   
   const handleOpenStudentModal = (student: Student | null) => { setSelectedStudent(student); setIsStudentModalOpen(true); };
@@ -289,9 +312,50 @@ const StudentsPage: React.FC = () => {
     handleCloseStudentModal();
   };
   
-  const handleDeleteStudent = (student: Student) => {
-    if (window.confirm(`Apakah Anda yakin ingin menghapus siswa "${student.name}"?`)) { deleteStudent(student.id); }
-  }
+  const handleDeleteStudent = async (student: Student) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus siswa "${student.name}"?`)) {
+        try {
+            await deleteStudent(student.id);
+        } catch (error) {
+            toast.error("Gagal menghapus siswa.");
+            console.error("Error deleting student:", error);
+        }
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredStudents.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredStudents.map(s => s.id)));
+    }
+  };
+  
+  const handleDeleteSelected = async () => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.size} siswa terpilih?`)) {
+      try {
+        await deleteStudentsBatch(Array.from(selectedIds));
+        setSelectedIds(new Set());
+      } catch (error) {
+        toast.error("Gagal menghapus siswa terpilih.");
+        console.error("Error deleting students batch:", error);
+      }
+    }
+  };
+
+  const isAllSelected = selectedIds.size > 0 && selectedIds.size === filteredStudents.length;
 
   return (
     <div>
@@ -306,6 +370,21 @@ const StudentsPage: React.FC = () => {
             </button>
         </div>
       </div>
+      
+      {selectedIds.size > 0 && (
+        <div className="bg-indigo-100 border border-indigo-300 rounded-lg p-3 mb-6 flex justify-between items-center animate-fade-in">
+            <div className="flex items-center">
+              <FiAlertCircle className="text-indigo-600 mr-3" />
+              <p className="font-semibold text-indigo-800">{selectedIds.size} siswa terpilih</p>
+            </div>
+            <button
+              onClick={handleDeleteSelected}
+              className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 flex items-center transition-colors text-sm"
+            >
+              <FiTrash2 className="mr-2" /> Hapus Terpilih
+            </button>
+        </div>
+      )}
 
       <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -332,6 +411,14 @@ const StudentsPage: React.FC = () => {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
+                <th className="p-4 w-12 text-center">
+                    <input type="checkbox"
+                      className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                      checked={isAllSelected}
+                      ref={el => el && (el.indeterminate = selectedIds.size > 0 && !isAllSelected)}
+                      onChange={handleSelectAll}
+                    />
+                </th>
                 <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Siswa</th>
                 <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">NIS</th>
                 <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Kelas</th>
@@ -341,9 +428,16 @@ const StudentsPage: React.FC = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="text-center p-4">Memuat data...</td></tr>
+                <tr><td colSpan={6} className="text-center p-4">Memuat data...</td></tr>
               ) : filteredStudents.length > 0 ? filteredStudents.map(student => (
-                <tr key={student.id} className="border-b border-slate-100 hover:bg-slate-50">
+                <tr key={student.id} className={`border-b border-slate-100 ${selectedIds.has(student.id) ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
+                   <td className="p-4 text-center">
+                    <input type="checkbox"
+                      className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                      checked={selectedIds.has(student.id)}
+                      onChange={() => handleSelectOne(student.id)}
+                    />
+                  </td>
                   <td className="p-4">
                     <div className="flex items-center space-x-3">
                       <img src={student.photoUrl} alt={student.name} className="w-10 h-10 rounded-full object-cover" />
@@ -361,7 +455,7 @@ const StudentsPage: React.FC = () => {
                   </td>
                 </tr>
               )) : (
-                 <tr><td colSpan={5} className="text-center p-8 text-slate-500">Tidak ada data siswa yang cocok.</td></tr>
+                 <tr><td colSpan={6} className="text-center p-8 text-slate-500">Tidak ada data siswa yang cocok.</td></tr>
               )}
             </tbody>
           </table>

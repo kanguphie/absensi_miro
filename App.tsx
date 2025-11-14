@@ -18,6 +18,8 @@ import ReportsPage from './pages/admin/ReportsPage';
 import DailyReportsPage from './pages/admin/DailyReportsPage';
 import SettingsPage from './pages/admin/SettingsPage';
 import ManualAttendancePage from './pages/ManualAttendancePage';
+import PeriodicReportsPage from './pages/admin/PeriodicReportsPage';
+import PhotoUploadPage from './pages/admin/PhotoUploadPage';
 
 const App: React.FC = () => {
   return (
@@ -41,8 +43,10 @@ const App: React.FC = () => {
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="students" element={<StudentsPage />} />
                 <Route path="classes" element={<ClassesPage />} />
+                <Route path="photo-upload" element={<PhotoUploadPage />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="daily-reports" element={<DailyReportsPage />} />
+                <Route path="periodic-reports" element={<PeriodicReportsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Routes>
