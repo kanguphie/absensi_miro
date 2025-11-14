@@ -21,6 +21,28 @@ const handleResponse = async (response: Response) => {
     return response.json();
 };
 
+const parseSettings = (settings: any): SchoolSettings => {
+    if (settings) {
+        if (typeof settings.operatingHours === 'string') {
+            try {
+                settings.operatingHours = JSON.parse(settings.operatingHours);
+            } catch (e) {
+                console.error("Failed to parse operatingHours", e);
+                settings.operatingHours = []; // fallback to empty array
+            }
+        }
+        if (typeof settings.holidays === 'string') {
+            try {
+                settings.holidays = JSON.parse(settings.holidays);
+            } catch (e) {
+                console.error("Failed to parse holidays", e);
+                settings.holidays = []; // fallback
+            }
+        }
+    }
+    return settings;
+};
+
 export const api = {
   // --- Student API ---
   getStudents: async (): Promise<Student[]> => {
@@ -154,7 +176,8 @@ export const api = {
   // --- Settings API ---
   getSettings: async (): Promise<SchoolSettings> => {
       const response = await fetch(`${API_BASE_URL}/settings`, { headers: getAuthHeaders() });
-      return handleResponse(response);
+      const settings = await handleResponse(response);
+      return parseSettings(settings);
   },
 
   updateSettings: async (newSettings: SchoolSettings): Promise<SchoolSettings> => {
@@ -163,7 +186,8 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(newSettings),
     });
-    return handleResponse(response);
+    const updatedSettings = await handleResponse(response);
+    return parseSettings(updatedSettings);
   },
 
   // --- Auth API ---
