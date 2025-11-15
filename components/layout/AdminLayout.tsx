@@ -20,6 +20,7 @@ import {
   FiActivity,
   FiImage,
   FiUserX,
+  FiClock,
 } from 'react-icons/fi';
 import Breadcrumb from './Breadcrumb';
 
@@ -54,6 +55,7 @@ const AdminLayout: React.FC = () => {
           { name: 'Laporan Harian', path: '/admin/daily-reports', icon: FiClipboard },
           { name: 'Laporan Periodik', path: '/admin/periodic-reports', icon: FiActivity },
           { name: 'Laporan Bulanan', path: '/admin/reports', icon: FiCalendar },
+          { name: 'Riwayat Absensi', path: '/admin/attendance-history', icon: FiClock },
       ]
     },
     { name: 'Pengaturan', path: '/admin/settings', icon: FiSettings },
@@ -126,7 +128,7 @@ const AdminLayout: React.FC = () => {
     );
   };
 
-  const SidebarContent = () => (
+  const SidebarContent: React.FC<{ closeSidebar?: () => void }> = ({ closeSidebar }) => (
     <>
        <div className="flex items-center justify-center h-20 border-b border-slate-700">
             <img src={settings?.schoolLogoUrl} alt="Logo" className="h-10 w-10 mr-3 bg-white p-1 rounded-full" />
@@ -134,7 +136,7 @@ const AdminLayout: React.FC = () => {
         </div>
         <div className="flex-1 overflow-y-auto">
             <nav className="p-4 space-y-2">
-                {navItems.map((item) => <NavItem key={item.name} item={item} />)}
+                {navItems.map((item) => <NavItem key={item.name} item={item} closeSidebar={closeSidebar} />)}
             </nav>
         </div>
         <div className="p-4 border-t border-slate-700">
@@ -161,7 +163,7 @@ const AdminLayout: React.FC = () => {
             <FiX size={24} />
           </button>
         </div>
-        <SidebarContent />
+        <SidebarContent closeSidebar={() => setSidebarOpen(false)} />
       </div>
 
       {/* Desktop Sidebar */}

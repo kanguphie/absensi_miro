@@ -18,38 +18,53 @@ const timeToMinutes = (time) => {
     return hours * 60 + minutes;
 };
 
-// FIX: Helper function to get the current date and time parts in 'Asia/Jakarta' timezone.
+// FIX: This function was incorrectly creating a Date object based on a localized string,
+// causing the server (likely running in UTC) to store a timestamp that was 7 hours ahead.
+// The new implementation correctly uses the current universal timestamp for storage (`new Date()`)
+// while using Intl.DateTimeFormat to get accurate date/time parts for the 'Asia/Jakarta'
+// timezone, which are needed for logic checks (e.g., operating hours, holidays).
 const getNowInWIB = () => {
-    const now = new Date();
-    // Use Intl.DateTimeFormat for robust timezone handling without external libraries
-    const formatter = new Intl.DateTimeFormat('en-CA', { // 'en-CA' gives YYYY-MM-DD format
+    const now = new Date(); // This is the correct universal timestamp for storage.
+
+    // We need parts of the date/time *as they are in WIB* for logic checks.
+    // Using a single formatter to get all parts is efficient.
+    const partsFormatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Jakarta',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
+        weekday: 'short',
         hour12: false,
     });
-    
-    const parts = formatter.formatToParts(now).reduce((acc, part) => {
+
+    const parts = partsFormatter.formatToParts(now).reduce((acc, part) => {
         if (part.type !== 'literal') {
             acc[part.type] = part.value;
         }
         return acc;
     }, {});
 
-    const dateStr = `${parts.year}-${parts.month}-${parts.day}`;
-    const timeStr = `${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}`; // Handle midnight case
+    // Construct YYYY-MM-DD date string using a specific formatter for that format.
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    });
+    const dateStr = dateFormatter.format(now);
 
-    const wibDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+    const timeStr = `${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}`;
+
+    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+    const day = dayMap[parts.weekday];
 
     return {
-        dateObject: wibDate,
-        day: wibDate.getDay(),
-        dateString: dateStr,
-        timeString: timeStr
+        dateObject: now,      // Correct object for DB storage (current UTC timestamp)
+        day,                  // Correct day of the week in WIB
+        dateString: dateStr,  // Correct YYYY-MM-DD date string in WIB
+        timeString: timeStr,  // Correct HH:mm time string in WIB
     };
 };
 
@@ -102,7 +117,6 @@ const internalRecordAttendance = async (student) => {
         catch(e) { console.error("Error parsing holidays:", e); settings.holidays = []; }
     }
 
-    // FIX: Use WIB timezone for all calculations
     const { dateObject, day, dateString: todayStr, timeString: currentTime } = getNowInWIB();
 
     if (settings.holidays.includes(todayStr)) {
@@ -258,7 +272,7 @@ router.post('/attendance/manual', async (req, res) => {
     await AttendanceLog.destroy({ where: { studentId, timestamp: { [Op.between]: [startOfDay, endOfDay] } } });
 
     const newLog = await AttendanceLog.create({
-        studentId, status, timestamp: new Date(`${date}T07:00:00`),
+        studentId, status, timestamp: new Date(`${date}T00:00:00Z`), // Set to midnight UTC, which is 7 AM WIB
         type: 'in', // Manual entries are always 'in' type
         studentName: student.name, studentPhotoUrl: student.photoUrl,
         className: student.SchoolClass?.name || ''

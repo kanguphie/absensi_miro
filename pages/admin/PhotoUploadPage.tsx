@@ -34,15 +34,18 @@ const PhotoUploadPage: React.FC = () => {
 
     const handleFiles = useCallback((files: FileList | null) => {
         if (!files) return;
-        const studentMapByNis = new Map(students.map(s => [s.nis, s]));
+        // FIX: Explicitly type the Map to aid TypeScript's type inference, preventing
+        // the value type from being inferred as `unknown` or `object`.
+        const studentMapByNis = new Map<string, Student>(students.map(s => [s.nis, s]));
         const existingFilenames = new Set(photoFiles.map(pf => pf.file.name));
 
         const newPhotoFiles: PhotoFile[] = Array.from(files)
             .filter(file => file.type.startsWith('image/') && !existingFilenames.has(file.name))
             .map((file, index) => {
                 const nis = file.name.split('.').slice(0, -1).join('.');
-                // FIX: Explicitly type the 'student' constant to resolve type inference issue.
-                const student: Student | null = studentMapByNis.get(nis) || null;
+                // Find a matching student for the photo based on NIS extracted from the filename.
+                // FIX: Used nullish coalescing operator (??) for safer default value handling. This corrects the type error.
+                const student = studentMapByNis.get(nis) ?? null;
                 return {
                     id: `${file.name}-${Date.now()}-${index}`,
                     file,

@@ -20,6 +20,7 @@ import ManualAttendancePage from './pages/ManualAttendancePage';
 import PeriodicReportsPage from './pages/admin/PeriodicReportsPage';
 import PhotoUploadPage from './pages/admin/PhotoUploadPage';
 import AttendanceManagementPage from './pages/admin/AttendanceManagementPage';
+import AttendanceHistoryPage from './pages/admin/AttendanceHistoryPage';
 
 const App: React.FC = () => {
   return (
@@ -48,6 +49,7 @@ const App: React.FC = () => {
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="daily-reports" element={<DailyReportsPage />} />
                 <Route path="periodic-reports" element={<PeriodicReportsPage />} />
+                <Route path="attendance-history" element={<AttendanceHistoryPage />} />
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
             </Routes>
