@@ -260,6 +260,16 @@ router.delete('/classes/:id', async (req, res) => {
 
 // Attendance Logs
 router.get('/attendance/logs', async (req, res) => res.json(await AttendanceLog.findAll({ order: [['timestamp', 'DESC']] })));
+
+router.post('/attendance/logs/batch-delete', async (req, res) => {
+    const { logIds } = req.body;
+    if (!logIds || !Array.isArray(logIds) || logIds.length === 0) {
+        return res.status(400).json({ success: false, message: 'Log IDs must be a non-empty array.' });
+    }
+    const deletedCount = await AttendanceLog.destroy({ where: { id: { [Op.in]: logIds } } });
+    res.json({ success: true, deletedCount });
+});
+
 router.post('/attendance/manual', async (req, res) => {
     const { studentId, status, date } = req.body;
     const student = await Student.findByPk(studentId, { include: SchoolClass });

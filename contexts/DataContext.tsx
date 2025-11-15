@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect, ReactNode, useCallback } from 'react';
 import { Student, SchoolClass, AttendanceLog, AttendanceStatus } from '../types';
 import { api } from '../services/api';
@@ -27,6 +26,7 @@ interface DataContextType {
   deleteClass: (id: string) => Promise<void>;
   // Attendance Management
   markAttendance: (studentId: string, status: AttendanceStatus, date: string) => Promise<void>;
+  deleteAttendanceLogsBatch: (logIds: string[]) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -205,8 +205,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [fetchData]);
 
+  const deleteAttendanceLogsBatch = useCallback(async (logIds: string[]) => {
+    try {
+        const result = await api.deleteAttendanceLogsBatch(logIds);
+        if (result.success) {
+            Swal.fire('Dihapus!', `${result.deletedCount} riwayat absensi berhasil dihapus.`, 'success');
+            fetchData();
+        } else {
+            Swal.fire('Gagal!', 'Gagal menghapus riwayat absensi.', 'error');
+        }
+    } catch(err) {
+        Swal.fire('Gagal!', 'Terjadi kesalahan saat menghubungi server.', 'error');
+    }
+  }, [fetchData]);
+
+
   return (
-    <DataContext.Provider value={{ students, classes, attendanceLogs, loading, recordAttendance, recordAttendanceByNis, refetchData, addStudent, updateStudent, updateStudentPhoto, deleteStudent, deleteStudentsBatch, addStudentsBatch, addClass, updateClass, deleteClass, markAttendance }}>
+    <DataContext.Provider value={{ students, classes, attendanceLogs, loading, recordAttendance, recordAttendanceByNis, refetchData, addStudent, updateStudent, updateStudentPhoto, deleteStudent, deleteStudentsBatch, addStudentsBatch, addClass, updateClass, deleteClass, markAttendance, deleteAttendanceLogsBatch }}>
       {children}
     </DataContext.Provider>
   );

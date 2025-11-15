@@ -1,9 +1,10 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Student, AttendanceLog, AttendanceStatus } from '../../types';
-import { FiSearch, FiDownload, FiBarChart2, FiChevronUp, FiChevronDown, FiClock } from 'react-icons/fi';
+import { FiSearch, FiDownload, FiBarChart2, FiChevronUp, FiChevronDown, FiTrash2, FiAlertCircle } from 'react-icons/fi';
 import * as XLSX from 'xlsx';
+
+declare const Swal: any;
 
 const toLocalISOString = (date: Date) => {
     const tzoffset = date.getTimezoneOffset() * 60000;
@@ -24,7 +25,7 @@ type EnrichedLog = AttendanceLog & { student?: Student };
 type SortableKeys = 'studentName' | 'nis' | 'className' | 'timestamp';
 
 const AttendanceHistoryPage: React.FC = () => {
-    const { attendanceLogs, students, classes, loading } = useData();
+    const { attendanceLogs, students, classes, loading, deleteAttendanceLogsBatch } = useData();
     const today = toLocalISOString(new Date());
 
     const [dateRange, setDateRange] = useState({ start: today, end: today });
@@ -35,6 +36,7 @@ const AttendanceHistoryPage: React.FC = () => {
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'timestamp', direction: 'descending' });
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState('25');
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const studentMap = useMemo(() => new Map(students.map(s => [s.id, s])), [students]);
     
@@ -104,6 +106,7 @@ const AttendanceHistoryPage: React.FC = () => {
 
     useEffect(() => {
         setCurrentPage(1);
+        setSelectedIds(new Set());
     }, [dateRange, searchTerm, classFilter, statusFilter, typeFilter, rowsPerPage]);
 
     const requestSort = (key: SortableKeys) => {
@@ -131,6 +134,68 @@ const AttendanceHistoryPage: React.FC = () => {
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Riwayat Absensi');
         XLSX.writeFile(workbook, `riwayat_absensi_${dateRange.start}_sd_${dateRange.end}.xlsx`);
     };
+
+    const handleSelectOne = (id: string) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedIds.size === sortedLogs.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(sortedLogs.map(s => s.id)));
+        }
+    };
+    
+    const isAllSelected = selectedIds.size > 0 && selectedIds.size === sortedLogs.length;
+
+    const handleDeleteSelected = () => {
+        Swal.fire({
+            title: 'Apakah Anda yakin?',
+            text: `Anda akan menghapus ${selectedIds.size} riwayat absensi terpilih. Aksi ini tidak dapat dibatalkan.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, hapus!',
+            cancelButtonText: 'Batal'
+        }).then(async (result: { isConfirmed: boolean }) => {
+            if (result.isConfirmed) {
+                await deleteAttendanceLogsBatch(Array.from(selectedIds));
+                setSelectedIds(new Set());
+            }
+        });
+    };
+    
+    const handleDeleteSingle = (log: EnrichedLog) => {
+        Swal.fire({
+           title: 'Hapus Riwayat Tunggal?',
+           text: `Anda akan menghapus riwayat absensi untuk ${log.studentName} pada ${new Date(log.timestamp).toLocaleString('id-ID')}.`,
+           icon: 'warning',
+           showCancelButton: true,
+           confirmButtonColor: '#d33',
+           cancelButtonColor: '#3085d6',
+           confirmButtonText: 'Ya, hapus!',
+           cancelButtonText: 'Batal'
+       }).then(async (result: { isConfirmed: boolean }) => {
+           if (result.isConfirmed) {
+               await deleteAttendanceLogsBatch([log.id]);
+               setSelectedIds(prev => {
+                   const newSet = new Set(prev);
+                   newSet.delete(log.id);
+                   return newSet;
+               });
+           }
+       });
+   }
     
     const SortableHeader: React.FC<{ columnKey: SortableKeys, title: string }> = ({ columnKey, title }) => {
         const isSorted = sortConfig?.key === columnKey;
@@ -159,6 +224,21 @@ const AttendanceHistoryPage: React.FC = () => {
                 </button>
             </div>
             
+            {selectedIds.size > 0 && (
+                <div className="bg-indigo-100 border border-indigo-300 rounded-lg p-3 mb-6 flex justify-between items-center animate-fade-in">
+                    <div className="flex items-center">
+                        <FiAlertCircle className="text-indigo-600 mr-3" />
+                        <p className="font-semibold text-indigo-800">{selectedIds.size} riwayat terpilih</p>
+                    </div>
+                    <button
+                        onClick={handleDeleteSelected}
+                        className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 flex items-center transition-colors text-sm"
+                    >
+                        <FiTrash2 className="mr-2" /> Hapus Terpilih
+                    </button>
+                </div>
+            )}
+
             <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 mb-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                     <input type="date" value={dateRange.start} onChange={e => setDateRange(prev => ({...prev, start: e.target.value}))} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
@@ -184,19 +264,35 @@ const AttendanceHistoryPage: React.FC = () => {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
+                                <th className="p-4 w-12 text-center">
+                                    <input type="checkbox"
+                                        className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                        checked={isAllSelected}
+                                        ref={el => { if (el) { el.indeterminate = selectedIds.size > 0 && !isAllSelected; } }}
+                                        onChange={handleSelectAll}
+                                    />
+                                </th>
                                 <SortableHeader columnKey="studentName" title="Siswa" />
                                 <SortableHeader columnKey="nis" title="NIS" />
                                 <SortableHeader columnKey="className" title="Kelas" />
                                 <SortableHeader columnKey="timestamp" title="Waktu" />
                                 <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Tipe</th>
                                 <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                                <th className="p-4 font-semibold text-slate-600 uppercase tracking-wider">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={6} className="text-center p-4">Memuat data...</td></tr>
+                                <tr><td colSpan={8} className="text-center p-4">Memuat data...</td></tr>
                             ) : paginatedLogs.length > 0 ? paginatedLogs.map(log => (
-                                <tr key={log.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                <tr key={log.id} className={`border-b border-slate-100 ${selectedIds.has(log.id) ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
+                                    <td className="p-4 text-center">
+                                        <input type="checkbox"
+                                            className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                                            checked={selectedIds.has(log.id)}
+                                            onChange={() => handleSelectOne(log.id)}
+                                        />
+                                    </td>
                                     <td className="p-4">
                                         <div className="flex items-center space-x-3">
                                             <img src={log.studentPhotoUrl} alt={log.studentName} className="w-10 h-10 rounded-full object-cover" />
@@ -219,9 +315,14 @@ const AttendanceHistoryPage: React.FC = () => {
                                             {log.status}
                                         </span>
                                     </td>
+                                    <td className="p-4">
+                                        <button onClick={() => handleDeleteSingle(log)} className="text-slate-500 hover:text-red-600 p-2 rounded-md hover:bg-slate-100">
+                                            <FiTrash2 size={16} />
+                                        </button>
+                                    </td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan={6} className="text-center p-8 text-slate-500">Tidak ada riwayat absensi yang cocok dengan filter.</td></tr>
+                                <tr><td colSpan={8} className="text-center p-8 text-slate-500">Tidak ada riwayat absensi yang cocok dengan filter.</td></tr>
                             )}
                         </tbody>
                     </table>

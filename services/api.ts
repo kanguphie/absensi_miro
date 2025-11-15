@@ -146,6 +146,15 @@ export const api = {
     return logs.map((log: any) => ({...log, timestamp: new Date(log.timestamp)}));
   },
 
+  deleteAttendanceLogsBatch: async (logIds: string[]): Promise<{ success: boolean; deletedCount: number; }> => {
+    const response = await fetch(`${API_BASE_URL}/attendance/logs/batch-delete`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ logIds }),
+    });
+    return handleResponse(response);
+  },
+
   recordAttendance: async (rfidUid: string): Promise<{ success: boolean; log?: AttendanceLog; message: string }> => {
     const response = await fetch(`${API_BASE_URL}/attendance/record-rfid`, {
       method: 'POST',
