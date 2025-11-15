@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiArrowLeft, FiXCircle, FiLogIn } from 'react-icons/fi';
+import { FiArrowLeft, FiSearch } from 'react-icons/fi';
 import { useData } from '../contexts/DataContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { Student } from '../types';
 
 declare const Swal: any;
 
 const ManualAttendancePage: React.FC = () => {
-  const [nis, setNis] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Student[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { recordAttendanceByNis } = useData();
+  
+  const { students, classes, recordAttendanceByNis } = useData();
   const { settings } = useSettings();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const playNotificationSound = (context: AudioContext, success: boolean) => {
     const oscillator = context.createOscillator();
@@ -31,15 +35,16 @@ const ManualAttendancePage: React.FC = () => {
     oscillator.stop(context.currentTime + 0.5);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nis.trim() || isProcessing) return;
+  const handleSelectStudent = async (student: Student) => {
+    if (isProcessing) return;
 
     setIsProcessing(true);
+    setSearchQuery('');
+    setSearchResults([]);
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
 
     try {
-      const result = await recordAttendanceByNis(nis.trim());
+      const result = await recordAttendanceByNis(student.nis);
       if (result.success && result.log) {
         const statusColor = result.log.status === 'Tepat Waktu' ? '#22c55e' : 
                             result.log.status === 'Terlambat' ? '#f59e0b' :
@@ -82,11 +87,37 @@ const ManualAttendancePage: React.FC = () => {
       }
     } catch (error) {
       Swal.fire('Error', 'Terjadi kesalahan koneksi.', 'error');
+      playNotificationSound(audioContext, false);
     } finally {
       setIsProcessing(false);
-      setNis('');
     }
   };
+  
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    if (query.length > 1) {
+      const filtered = students.filter(student => 
+        student.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setSearchResults(filtered);
+    } else {
+      setSearchResults([]);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSearchResults([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
@@ -94,41 +125,59 @@ const ManualAttendancePage: React.FC = () => {
         <div className="text-center mb-6">
           <img src={settings?.schoolLogoUrl} alt="Logo Sekolah" className="mx-auto h-20 w-20 mb-4 rounded-full" />
           <h1 className="text-3xl font-bold text-gray-900">Absensi Manual</h1>
-          <p className="text-gray-600 mt-2">Masukkan Nomor Induk Siswa (NIS) untuk mencatat kehadiran.</p>
+          <p className="text-gray-600 mt-2">Ketik nama siswa untuk mencari dan mencatat kehadiran.</p>
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="nis" className="block text-sm font-medium text-gray-700 mb-1">
-                Nomor Induk Siswa (NIS)
-              </label>
+          <div className="relative" ref={searchContainerRef}>
+            <label htmlFor="student-search" className="block text-sm font-medium text-gray-700 mb-1">
+              Cari Nama Siswa
+            </label>
+            <div className="relative">
+              <FiSearch className="absolute top-1/2 -translate-y-1/2 left-4 text-gray-400" />
               <input
-                id="nis"
+                id="student-search"
                 type="text"
-                value={nis}
-                onChange={(e) => setNis(e.target.value)}
-                placeholder="Contoh: 240101"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Ketik min. 2 huruf nama siswa..."
+                className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
                 required
                 autoFocus
+                autoComplete="off"
+                disabled={isProcessing}
               />
-            </div>
-            <button
-              type="submit"
-              disabled={isProcessing}
-              className="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all duration-300 ease-in-out flex items-center justify-center disabled:bg-emerald-400"
-            >
-              {isProcessing ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <>
-                  <FiLogIn className="mr-2" />
-                  Catat Kehadiran
-                </>
+              {isProcessing && (
+                <div className="absolute top-1/2 -translate-y-1/2 right-4">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600"></div>
+                </div>
               )}
-            </button>
-          </form>
+            </div>
+
+            {searchResults.length > 0 && (
+              <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto animate-fade-in">
+                {searchResults.map(student => (
+                  <li key={student.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectStudent(student)}
+                      className="w-full text-left px-4 py-3 hover:bg-emerald-50 flex items-center gap-3 transition-colors"
+                    >
+                      <img src={student.photoUrl} alt={student.name} className="w-10 h-10 rounded-full object-cover"/>
+                      <div>
+                        <p className="font-semibold text-gray-800">{student.name}</p>
+                        <p className="text-sm text-gray-500">{classes.find(c => c.id === student.classId)?.name}</p>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            
+            {searchQuery.length > 1 && searchResults.length === 0 && !isProcessing && (
+                <p className="text-center text-sm text-gray-500 mt-4">Siswa tidak ditemukan.</p>
+            )}
+          </div>
         </div>
 
         <div className="text-center mt-6">
