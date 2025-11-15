@@ -7,8 +7,8 @@ import { FiLogIn, FiUser, FiLock, FiEye, FiEyeOff, FiHome } from 'react-icons/fi
 declare const Swal: any;
 
 const LoginPage: React.FC = () => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { login, loading } = useAuth();
   const { settings } = useSettings();
