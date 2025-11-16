@@ -31,21 +31,41 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+const getInitialLogs = (): AttendanceLog[] => {
+    try {
+        const item = sessionStorage.getItem('kioskAttendanceLogs');
+        if (item) {
+            const parsed = JSON.parse(item);
+            // Convert timestamp strings back to Date objects
+            return parsed.map((log: any) => ({...log, timestamp: new Date(log.timestamp)}));
+        }
+    } catch (error) {
+        console.error("Error reading logs from sessionStorage", error);
+    }
+    return [];
+};
+
+
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>(getInitialLogs());
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
+  // This useEffect will persist Kiosk logs to sessionStorage
+  useEffect(() => {
     if (!isAuthenticated) {
-      setStudents([]);
-      setClasses([]);
-      setAttendanceLogs([]);
-      setLoading(false);
-      return;
+      try {
+        // Store the 50 most recent logs to prevent bloating sessionStorage
+        sessionStorage.setItem('kioskAttendanceLogs', JSON.stringify(attendanceLogs.slice(0, 50)));
+      } catch (error) {
+        console.error("Error saving logs to sessionStorage", error);
+      }
     }
+  }, [attendanceLogs, isAuthenticated]);
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [studentsData, classesData, logsData] = await Promise.all([
@@ -64,11 +84,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (isAuthenticated) {
+        // When an admin logs in, fetch all data from the server.
+        // Clear session storage to ensure a clean state if they log out.
+        sessionStorage.removeItem('kioskAttendanceLogs');
+        fetchData();
+    } else {
+        // When unauthenticated (Kiosk mode or after logout),
+        // ensure admin-specific data is cleared and logs are from session.
+        setStudents([]);
+        setClasses([]);
+        setAttendanceLogs(getInitialLogs());
+        setLoading(false);
+    }
+  }, [isAuthenticated, fetchData]);
 
   const recordAttendance = useCallback(async (rfidUid: string) => {
     const result = await api.recordAttendance(rfidUid);
