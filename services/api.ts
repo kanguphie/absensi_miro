@@ -49,6 +49,11 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/students`, { headers: getAuthHeaders() });
     return handleResponse(response);
   },
+  
+  getPublicStudents: async (): Promise<Student[]> => {
+    const response = await fetch(`${API_BASE_URL}/students/public-list`);
+    return handleResponse(response);
+  },
 
   addStudent: async (studentData: Omit<Student, 'id' | 'photoUrl'>): Promise<Student> => {
     const response = await fetch(`${API_BASE_URL}/students`, {
@@ -107,7 +112,7 @@ export const api = {
 
   // --- Class API ---
   getClasses: async (): Promise<SchoolClass[]> => {
-    const response = await fetch(`${API_BASE_URL}/classes`, { headers: getAuthHeaders() });
+    const response = await fetch(`${API_BASE_URL}/classes`);
     return handleResponse(response);
   },
 

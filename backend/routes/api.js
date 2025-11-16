@@ -196,7 +196,7 @@ router.post('/attendance/record-nis', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 });
 
-// --- Public Settings Route ---
+// --- Public Data Routes ---
 router.get('/settings', async (req, res) => {
     try {
         const [setting] = await Setting.findOrCreate({
@@ -209,6 +209,20 @@ router.get('/settings', async (req, res) => {
         res.status(500).json({ message: "Gagal memuat pengaturan dari database." });
     }
 });
+
+router.get('/students/public-list', async (req, res) => {
+    try {
+        const students = await Student.findAll({
+            attributes: ['id', 'nis', 'name', 'classId', 'photoUrl'],
+            order: [['name', 'ASC']],
+        });
+        res.json(students);
+    } catch (error) {
+        res.status(500).json({ message: "Gagal memuat daftar siswa." });
+    }
+});
+
+router.get('/classes', async (req, res) => res.json(await SchoolClass.findAll({ order: [['name', 'ASC']] })));
 
 
 // --- Protected Routes ---
@@ -243,7 +257,6 @@ router.post('/students/batch-add', async (req, res) => {
 });
 
 // Classes
-router.get('/classes', async (req, res) => res.json(await SchoolClass.findAll({ order: [['name', 'ASC']] })));
 router.post('/classes', async (req, res) => res.status(201).json(await SchoolClass.create(req.body)));
 router.put('/classes/:id', async (req, res) => {
     await SchoolClass.update(req.body, { where: { id: req.params.id } });

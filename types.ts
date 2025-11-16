@@ -4,7 +4,7 @@ export interface Student {
   nis: string;
   name: string;
   classId: string;
-  rfidUid: string;
+  rfidUid?: string;
   photoUrl: string;
 }
 

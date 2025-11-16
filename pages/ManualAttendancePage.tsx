@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiArrowLeft, FiSearch } from 'react-icons/fi';
+import { FiArrowLeft, FiSearch, FiLoader } from 'react-icons/fi';
 import { useData } from '../contexts/DataContext';
 import { useSettings } from '../contexts/SettingsContext';
-import { Student } from '../types';
+import { Student, SchoolClass } from '../types';
+import { api } from '../services/api';
 
 declare const Swal: any;
 
@@ -12,9 +13,32 @@ const ManualAttendancePage: React.FC = () => {
   const [searchResults, setSearchResults] = useState<Student[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  const { students, classes, recordAttendanceByNis } = useData();
+  const [localStudents, setLocalStudents] = useState<Student[]>([]);
+  const [localClasses, setLocalClasses] = useState<SchoolClass[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  
+  const { recordAttendanceByNis } = useData();
   const { settings } = useSettings();
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchPublicData = async () => {
+      try {
+        const [studentsData, classesData] = await Promise.all([
+          api.getPublicStudents(),
+          api.getClasses(),
+        ]);
+        setLocalStudents(studentsData);
+        setLocalClasses(classesData);
+      } catch (error) {
+        console.error("Failed to fetch public data for manual attendance:", error);
+        Swal.fire('Error', 'Gagal memuat data. Mohon muat ulang halaman.', 'error');
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    fetchPublicData();
+  }, []);
 
   const playNotificationSound = (context: AudioContext, success: boolean) => {
     const oscillator = context.createOscillator();
@@ -98,7 +122,7 @@ const ManualAttendancePage: React.FC = () => {
     setSearchQuery(query);
 
     if (query.length > 1) {
-      const filtered = students.filter(student => 
+      const filtered = localStudents.filter(student => 
         student.name.toLowerCase().includes(query.toLowerCase())
       );
       setSearchResults(filtered);
@@ -140,16 +164,16 @@ const ManualAttendancePage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchChange}
-                placeholder="Ketik min. 2 huruf nama siswa..."
+                placeholder={isLoadingData ? "Memuat data siswa..." : "Ketik min. 2 huruf nama siswa..."}
                 className="w-full pl-12 pr-12 py-3 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 transition"
                 required
                 autoFocus
                 autoComplete="off"
-                disabled={isProcessing}
+                disabled={isProcessing || isLoadingData}
               />
-              {isProcessing && (
+              {(isProcessing || isLoadingData) && (
                 <div className="absolute top-1/2 -translate-y-1/2 right-4">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-600"></div>
+                  <FiLoader className="animate-spin text-emerald-600" />
                 </div>
               )}
             </div>
@@ -166,7 +190,7 @@ const ManualAttendancePage: React.FC = () => {
                       <img src={student.photoUrl} alt={student.name} className="w-10 h-10 rounded-full object-cover"/>
                       <div>
                         <p className="font-semibold text-gray-800">{student.name}</p>
-                        <p className="text-sm text-gray-500">{classes.find(c => c.id === student.classId)?.name}</p>
+                        <p className="text-sm text-gray-500">{localClasses.find(c => c.id === student.classId)?.name}</p>
                       </div>
                     </button>
                   </li>
@@ -174,7 +198,7 @@ const ManualAttendancePage: React.FC = () => {
               </ul>
             )}
             
-            {searchQuery.length > 1 && searchResults.length === 0 && !isProcessing && (
+            {searchQuery.length > 1 && searchResults.length === 0 && !isProcessing && !isLoadingData && (
                 <p className="text-center text-sm text-gray-500 mt-4">Siswa tidak ditemukan.</p>
             )}
           </div>
