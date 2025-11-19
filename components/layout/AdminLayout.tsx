@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -40,7 +40,10 @@ import AIRecapPage from '../../pages/admin/AIRecapPage';
 
 const AdminLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [openMenus, setOpenMenus] = useState<string[]>(['Manajemen Data', 'Laporan']);
+  // Changed from array to single string to support Accordion behavior (one open at a time)
+  // Default is null (all collapsed)
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  
   const { logout, user } = useAuth();
   const { settings } = useSettings();
   const navigate = useNavigate();
@@ -77,12 +80,23 @@ const AdminLayout: React.FC = () => {
     { name: 'Pengaturan', path: '/admin/settings', icon: FiSettings },
   ];
 
-  const toggleMenu = (menuName: string) => {
-    if (openMenus.includes(menuName)) {
-      setOpenMenus(openMenus.filter(name => name !== menuName));
+  // Effect to auto-expand the menu that contains the current active route
+  useEffect(() => {
+    const activeItem = navItems.find(item => 
+      item.subItems?.some(sub => pathname.startsWith(sub.path))
+    );
+    
+    if (activeItem) {
+      setActiveMenu(activeItem.name);
     } else {
-      setOpenMenus([...openMenus, menuName]);
+      // If on a page with no submenu (like Dashboard), collapse all
+      setActiveMenu(null);
     }
+  }, [pathname]);
+
+  const toggleMenu = (menuName: string) => {
+    // Accordion logic: If clicking the open one, close it. If clicking a new one, open it (and close others implicitly).
+    setActiveMenu(prev => (prev === menuName ? null : menuName));
   };
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
@@ -123,19 +137,19 @@ const AdminLayout: React.FC = () => {
                   <button
                     onClick={() => toggleMenu(item.name)}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                      openMenus.includes(item.name) 
+                      activeMenu === item.name 
                         ? 'bg-white/10 text-white' 
                         : 'text-slate-400 hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center">
-                      <item.icon className={`w-5 h-5 mr-3 ${openMenus.includes(item.name) ? 'text-indigo-400' : 'text-slate-500'}`} />
+                      <item.icon className={`w-5 h-5 mr-3 ${activeMenu === item.name ? 'text-indigo-400' : 'text-slate-500'}`} />
                       {item.name}
                     </div>
-                    {openMenus.includes(item.name) ? <FiChevronUp /> : <FiChevronDown />}
+                    {activeMenu === item.name ? <FiChevronUp /> : <FiChevronDown />}
                   </button>
-                  {openMenus.includes(item.name) && (
-                    <div className="mt-1 ml-4 space-y-1 border-l-2 border-slate-700 pl-2">
+                  {activeMenu === item.name && (
+                    <div className="mt-1 ml-4 space-y-1 border-l-2 border-slate-700 pl-2 animate-fade-in">
                       {item.subItems.map((subItem) => (
                         <Link
                           key={subItem.path}
