@@ -57,11 +57,20 @@ export interface SpecificSchedule {
   operatingHours: OperatingHours[];
 }
 
+export interface EarlyDismissal {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm (Jam pulang baru)
+  reason: string; // e.g. "Rapat Guru"
+  classIds: string[]; // Empty array [] means ALL classes
+}
+
 export interface SchoolSettings {
   schoolName: string;
   schoolLogoUrl: string;
   operatingHours: OperatingHours[]; // Default/General Schedule
   specificSchedules: SpecificSchedule[]; // Override for specific classes
+  earlyDismissals: EarlyDismissal[]; // One-time overrides (Highest Priority)
   holidays: string[];
   manualPin?: string; // PIN for protecting manual attendance page
 }

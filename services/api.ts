@@ -1,6 +1,4 @@
 
-
-
 import { Student, SchoolClass, AttendanceLog, SchoolSettings, User, AttendanceStatus } from '../types';
 
 const API_BASE_URL = 'https://apimiro.madarussalamsubah.id/api';
@@ -26,7 +24,7 @@ const handleResponse = async (response: Response) => {
 
 const parseSettings = (settings: any): SchoolSettings => {
     if (settings) {
-        ['operatingHours', 'holidays', 'specificSchedules'].forEach(field => {
+        ['operatingHours', 'holidays', 'specificSchedules', 'earlyDismissals'].forEach(field => {
              if (typeof settings[field] === 'string') {
                 try {
                     settings[field] = JSON.parse(settings[field]);
@@ -36,8 +34,9 @@ const parseSettings = (settings: any): SchoolSettings => {
                 }
             }
         });
-        // Ensure specificSchedules is initialized if missing from older DB records
+        // Ensure arrays are initialized if missing from older DB records
         if (!settings.specificSchedules) settings.specificSchedules = [];
+        if (!settings.earlyDismissals) settings.earlyDismissals = [];
     }
     return settings;
 };

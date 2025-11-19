@@ -1,13 +1,9 @@
 
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useData } from '../../contexts/DataContext';
-import { SchoolSettings, OperatingHours, SpecificSchedule } from '../../types';
-import { FiSave, FiPlus, FiTrash2, FiLock, FiKey, FiClock, FiUsers, FiX } from 'react-icons/fi';
+import { SchoolSettings, OperatingHours, SpecificSchedule, EarlyDismissal } from '../../types';
+import { FiSave, FiPlus, FiTrash2, FiLock, FiKey, FiClock, FiUsers, FiX, FiAlertTriangle, FiCalendar } from 'react-icons/fi';
 import { api } from '../../services/api';
 
 declare const Swal: any;
@@ -89,7 +85,7 @@ const SettingsPage: React.FC = () => {
   const { classes } = useData();
   const [formState, setFormState] = useState<SchoolSettings | null>(null);
   const [newHoliday, setNewHoliday] = useState('');
-  const [activeTab, setActiveTab] = useState<'general' | 'specific'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'specific' | 'incidental'>('general');
   
   // Specific Schedule Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,6 +93,13 @@ const SettingsPage: React.FC = () => {
   const [scheduleName, setScheduleName] = useState('');
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [scheduleHours, setScheduleHours] = useState<OperatingHours[]>(JSON.parse(JSON.stringify(initialHours)));
+
+  // Early Dismissal Modal State
+  const [isDismissalModalOpen, setIsDismissalModalOpen] = useState(false);
+  const [dismissalDate, setDismissalDate] = useState('');
+  const [dismissalTime, setDismissalTime] = useState('10:00');
+  const [dismissalReason, setDismissalReason] = useState('');
+  const [dismissalClasses, setDismissalClasses] = useState<string[]>([]); // Empty = all
 
   // Password change state
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
@@ -171,7 +174,6 @@ const SettingsPage: React.FC = () => {
               operatingHours: scheduleHours
           };
 
-          // Deep copy to ensure reactivity
           let updatedSchedules = formState.specificSchedules ? [...formState.specificSchedules] : [];
           
           if (editingSchedule) {
@@ -190,6 +192,50 @@ const SettingsPage: React.FC = () => {
           const updatedSchedules = formState.specificSchedules ? formState.specificSchedules.filter(s => s.id !== id) : [];
           setFormState({...formState, specificSchedules: updatedSchedules});
       }
+  }
+
+  // --- Early Dismissal Logic ---
+  const handleAddDismissal = () => {
+      if (!dismissalDate) { Swal.fire('Error', 'Tanggal wajib diisi', 'error'); return; }
+      if (!dismissalTime) { Swal.fire('Error', 'Jam pulang wajib diisi', 'error'); return; }
+      if (!dismissalReason) { Swal.fire('Error', 'Alasan wajib diisi', 'error'); return; }
+      
+      if (formState) {
+          const newDismissal: EarlyDismissal = {
+              id: Date.now().toString(),
+              date: dismissalDate,
+              time: dismissalTime,
+              reason: dismissalReason,
+              classIds: dismissalClasses
+          };
+          
+          const currentDismissals = formState.earlyDismissals || [];
+          // Check if date already exists
+          if(currentDismissals.some(d => d.date === dismissalDate && d.classIds.length === 0)) {
+               Swal.fire('Error', 'Sudah ada jadwal insidental untuk semua kelas pada tanggal ini.', 'error'); 
+               return;
+          }
+
+          setFormState({
+              ...formState, 
+              earlyDismissals: [...currentDismissals, newDismissal].sort((a,b) => a.date.localeCompare(b.date))
+          });
+          setIsDismissalModalOpen(false);
+          setDismissalDate(''); setDismissalReason(''); setDismissalClasses([]);
+      }
+  }
+
+  const deleteDismissal = (id: string) => {
+      if (formState) {
+          setFormState({
+              ...formState,
+              earlyDismissals: formState.earlyDismissals.filter(d => d.id !== id)
+          });
+      }
+  }
+  
+  const toggleDismissalClass = (classId: string) => {
+      setDismissalClasses(prev => prev.includes(classId) ? prev.filter(id => id !== classId) : [...prev, classId]);
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,11 +340,11 @@ const SettingsPage: React.FC = () => {
 
                 {/* Operating Hours with Tabs */}
                 <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="flex border-b border-slate-200">
+                    <div className="flex border-b border-slate-200 overflow-x-auto">
                         <button 
                             type="button"
                             onClick={() => setActiveTab('general')} 
-                            className={`flex-1 py-4 px-6 text-sm font-medium focus:outline-none ${activeTab === 'general' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            className={`flex-1 py-4 px-4 whitespace-nowrap text-sm font-medium focus:outline-none ${activeTab === 'general' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                         >
                             <div className="flex items-center justify-center">
                                 <FiClock className="mr-2" /> Jadwal Umum
@@ -307,24 +353,35 @@ const SettingsPage: React.FC = () => {
                         <button 
                             type="button"
                             onClick={() => setActiveTab('specific')} 
-                            className={`flex-1 py-4 px-6 text-sm font-medium focus:outline-none ${activeTab === 'specific' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                            className={`flex-1 py-4 px-4 whitespace-nowrap text-sm font-medium focus:outline-none ${activeTab === 'specific' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                         >
                             <div className="flex items-center justify-center">
-                                <FiUsers className="mr-2" /> Jadwal Khusus (Per Kelas)
+                                <FiUsers className="mr-2" /> Jadwal Khusus
+                            </div>
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setActiveTab('incidental')} 
+                            className={`flex-1 py-4 px-4 whitespace-nowrap text-sm font-medium focus:outline-none ${activeTab === 'incidental' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                        >
+                            <div className="flex items-center justify-center">
+                                <FiAlertTriangle className="mr-2" /> Jadwal Insidental
                             </div>
                         </button>
                     </div>
                     
                     <div className="p-6">
-                        {activeTab === 'general' ? (
+                        {activeTab === 'general' && (
                             <div>
                                 <p className="text-slate-500 mb-6 text-sm">Jadwal ini berlaku untuk semua kelas yang <strong>tidak</strong> memiliki jadwal khusus.</p>
                                 <OperatingHoursEditor hours={formState.operatingHours} onChange={handleGeneralHoursChange} />
                             </div>
-                        ) : (
+                        )}
+                        
+                        {activeTab === 'specific' && (
                             <div>
                                 <div className="flex justify-between items-center mb-6">
-                                    <p className="text-slate-500 text-sm">Buat jadwal berbeda untuk kelas tertentu (misal: Kelas 1 & 2 pulang lebih awal).</p>
+                                    <p className="text-slate-500 text-sm">Buat jadwal rutin berbeda untuk kelas tertentu (misal: Kelas 1 & 2 selalu pulang lebih awal).</p>
                                     <button type="button" onClick={() => openScheduleModal()} className="bg-indigo-600 text-white text-sm font-bold py-2 px-3 rounded-lg hover:bg-indigo-700 flex items-center"><FiPlus className="mr-1"/> Tambah Jadwal</button>
                                 </div>
                                 
@@ -353,6 +410,43 @@ const SettingsPage: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+                        )}
+
+                        {activeTab === 'incidental' && (
+                             <div>
+                                <div className="flex justify-between items-center mb-6">
+                                    <p className="text-slate-500 text-sm">Atur jadwal pulang lebih awal untuk hari tertentu (misal: Rapat Guru, Ujian, Hari Terjepit). <br/><strong>Prioritas Tertinggi:</strong> Jadwal ini akan mengabaikan Jadwal Umum dan Khusus.</p>
+                                    <button type="button" onClick={() => setIsDismissalModalOpen(true)} className="bg-indigo-600 text-white text-sm font-bold py-2 px-3 rounded-lg hover:bg-indigo-700 flex items-center"><FiPlus className="mr-1"/> Tambah Pengecualian</button>
+                                </div>
+
+                                {formState.earlyDismissals && formState.earlyDismissals.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {formState.earlyDismissals.map(dismissal => {
+                                            const isPast = new Date(dismissal.date) < new Date(new Date().setHours(0,0,0,0));
+                                            return (
+                                                <div key={dismissal.id} className={`border border-slate-200 rounded-lg p-4 flex justify-between items-center ${isPast ? 'bg-slate-50 opacity-70' : 'bg-white'}`}>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-bold text-slate-800">{new Date(dismissal.date).toLocaleDateString('id-ID', {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'})}</span>
+                                                            <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full font-semibold">Pulang {dismissal.time}</span>
+                                                            {isPast && <span className="bg-slate-200 text-slate-600 text-xs px-2 py-1 rounded-full">Sudah Lewat</span>}
+                                                        </div>
+                                                        <p className="text-sm text-slate-600 mt-1">
+                                                            <strong>Alasan:</strong> {dismissal.reason} | 
+                                                            <strong> Berlaku:</strong> {dismissal.classIds.length === 0 ? 'Semua Kelas' : dismissal.classIds.map(id => classes.find(c => c.id === id)?.name).join(', ')}
+                                                        </p>
+                                                    </div>
+                                                    <button type="button" onClick={() => deleteDismissal(dismissal.id)} className="text-red-500 hover:text-red-700 p-2"><FiTrash2 /></button>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-10 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                                        <p className="text-slate-500">Belum ada jadwal insidental.</p>
+                                    </div>
+                                )}
+                             </div>
                         )}
                     </div>
                 </div>
@@ -432,6 +526,53 @@ const SettingsPage: React.FC = () => {
                 <div className="flex justify-end space-x-3 p-5 border-t border-slate-200 bg-slate-50 rounded-b-lg">
                     <button onClick={() => setIsModalOpen(false)} className="bg-white border border-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 transition-colors">Batal</button>
                     <button onClick={saveSpecificSchedule} className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center transition-colors">Simpan Jadwal</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Modal for Early Dismissal */}
+      {isDismissalModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg animate-fade-in">
+                <div className="flex justify-between items-center p-5 border-b border-slate-200">
+                    <h2 className="text-xl font-bold text-slate-800">Tambah Jadwal Insidental</h2>
+                    <button onClick={() => setIsDismissalModalOpen(false)} className="text-slate-400 hover:text-slate-600"><FiX size={24}/></button>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal</label>
+                        <input type="date" value={dismissalDate} onChange={e => setDismissalDate(e.target.value)} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Jam Pulang Baru</label>
+                        <input type="time" value={dismissalTime} onChange={e => setDismissalTime(e.target.value)} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+                        <p className="text-xs text-slate-500 mt-1">Jam scan pulang akan dibuka otomatis 15-30 menit sebelum jam ini.</p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Alasan (Wajib)</label>
+                        <input type="text" value={dismissalReason} onChange={e => setDismissalReason(e.target.value)} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Contoh: Rapat Dewan Guru"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Berlaku Untuk</label>
+                        <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2 grid grid-cols-2 gap-2">
+                            <label className={`cursor-pointer p-2 rounded border text-center text-sm ${dismissalClasses.length === 0 ? 'bg-indigo-100 border-indigo-500 text-indigo-700 font-bold' : 'bg-slate-50 border-slate-200'}`}>
+                                <input type="checkbox" className="hidden" checked={dismissalClasses.length === 0} onChange={() => setDismissalClasses([])} />
+                                Semua Kelas
+                            </label>
+                            {classes.map(cls => (
+                                <label key={cls.id} className={`cursor-pointer p-2 rounded border text-center text-sm ${dismissalClasses.includes(cls.id) ? 'bg-indigo-100 border-indigo-500 text-indigo-700 font-bold' : 'bg-slate-50 border-slate-200'}`}>
+                                    <input type="checkbox" className="hidden" checked={dismissalClasses.includes(cls.id)} onChange={() => toggleDismissalClass(cls.id)} />
+                                    {cls.name}
+                                </label>
+                            ))}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">Jika "Semua Kelas" dipilih, pilihan kelas spesifik akan diabaikan.</p>
+                    </div>
+                </div>
+                <div className="flex justify-end space-x-3 p-5 border-t border-slate-200 bg-slate-50 rounded-b-lg">
+                    <button onClick={() => setIsDismissalModalOpen(false)} className="bg-white border border-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 transition-colors">Batal</button>
+                    <button onClick={handleAddDismissal} className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center transition-colors">Simpan</button>
                 </div>
             </div>
         </div>

@@ -1,7 +1,4 @@
 
-
-
-
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -123,19 +120,18 @@ const internalRecordAttendance = async (student) => {
     const settings = settingsInstance.get({ plain: true });
     
     // Parsing JSON fields safely
-    ['operatingHours', 'holidays', 'specificSchedules'].forEach(field => {
+    ['operatingHours', 'holidays', 'specificSchedules', 'earlyDismissals'].forEach(field => {
         if (typeof settings[field] === 'string') {
             try { settings[field] = JSON.parse(settings[field]); }
             catch (e) { 
                 console.error(`Error parsing ${field}:`, e); 
-                settings[field] = (field === 'holidays' || field === 'specificSchedules') ? [] : []; 
+                settings[field] = []; 
             }
         }
     });
-    // Ensure specificSchedules is array
-    if (!Array.isArray(settings.specificSchedules)) {
-        settings.specificSchedules = [];
-    }
+    // Ensure arrays
+    if (!Array.isArray(settings.specificSchedules)) settings.specificSchedules = [];
+    if (!Array.isArray(settings.earlyDismissals)) settings.earlyDismissals = [];
 
     const { dateObject, day, dateString: todayStr, timeString: currentTime } = getNowInWIB();
 
@@ -146,32 +142,54 @@ const internalRecordAttendance = async (student) => {
     const dayGroup = (day >= 1 && day <= 4) ? 'mon-thu' : (day === 5) ? 'fri' : (day === 6) ? 'sat' : null;
     if (!dayGroup) return { success: false, message: 'Absensi tidak tersedia hari ini' };
 
-    // === LOGIC CHANGE: DETERMINE OPERATING HOURS ===
-    let opHours = null;
-    let isSpecific = false;
+    // === LOGIC FOR DETERMINING SCHEDULE PRIORITY ===
+    
+    // 0. Determine Base Operating Hours (General Schedule)
+    let baseOpHours = settings.operatingHours.find(h => h.dayGroup === dayGroup);
+    
+    if (!baseOpHours || !baseOpHours.enabled) {
+         return { success: false, message: 'Absensi tidak tersedia saat ini untuk kelas ini' };
+    }
+    
+    // Clone to avoid mutating original settings reference
+    let finalOpHours = { ...baseOpHours };
 
-    // 1. Check for Specific Schedule for this student's class
-    if (settings.specificSchedules && settings.specificSchedules.length > 0) {
-        // Loop through specific schedules to find one that includes the student's classId
+    // 1. Check for Specific Schedules (Overrides General)
+    // Does this student's class have a specific regular schedule?
+    if (settings.specificSchedules.length > 0) {
         const matchedSchedule = settings.specificSchedules.find(schedule => 
             schedule.classIds && schedule.classIds.includes(student.classId)
         );
         
         if (matchedSchedule) {
-            opHours = matchedSchedule.operatingHours.find(h => h.dayGroup === dayGroup);
-            isSpecific = true;
+            const specificDayHours = matchedSchedule.operatingHours.find(h => h.dayGroup === dayGroup);
+            if (specificDayHours && specificDayHours.enabled) {
+                finalOpHours = { ...specificDayHours };
+            }
         }
     }
 
-    // 2. If no specific schedule found, fallback to General Schedule
-    if (!opHours) {
-        opHours = settings.operatingHours.find(h => h.dayGroup === dayGroup);
+    // 2. Check for Early Dismissals / Incidental (Overrides Everything)
+    // Is there a rule for TODAY?
+    if (settings.earlyDismissals.length > 0) {
+        const override = settings.earlyDismissals.find(ed => ed.date === todayStr);
+        if (override) {
+            // Check if this override applies to this student (empty classIds means ALL classes)
+            const appliesToStudent = override.classIds.length === 0 || override.classIds.includes(student.classId);
+            
+            if (appliesToStudent) {
+                // Apply the override!
+                // We keep check-in time as is, but change check-out time
+                finalOpHours.checkOutTime = override.time;
+                // Adjust scanOutBefore to ensure it's reasonable (e.g. 30 mins before new time)
+                // or keep original if it makes sense. Let's stick to the config but ensure it works.
+                // Usually for early dismissal, we want to allow scanning out immediately or a bit before.
+            }
+        }
     }
 
-    // 3. Validation
-    if (!opHours || !opHours.enabled) return { success: false, message: 'Absensi tidak tersedia saat ini untuk kelas ini' };
-
-    const period = getAttendancePeriod(currentTime, opHours);
+    // 3. Calculate Period based on FINAL Operating Hours
+    const period = getAttendancePeriod(currentTime, finalOpHours);
     if (period === 'CLOSED') return { success: false, message: 'Waktu absensi ditutup' };
 
     const startOfDay = new Date(dateObject);
@@ -189,7 +207,7 @@ const internalRecordAttendance = async (student) => {
         if (todayLogs.some(log => log.type === 'in')) {
             return { success: false, message: 'Anda sudah absen masuk hari ini' };
         }
-        const lateDeadlineMinutes = timeToMinutes(opHours.checkInTime) + opHours.lateTolerance;
+        const lateDeadlineMinutes = timeToMinutes(finalOpHours.checkInTime) + finalOpHours.lateTolerance;
         const currentMinutes = timeToMinutes(currentTime);
         const status = currentMinutes > lateDeadlineMinutes ? 'Terlambat' : 'Tepat Waktu';
 
@@ -207,7 +225,7 @@ const internalRecordAttendance = async (student) => {
         if (todayLogs.some(log => log.type === 'out')) {
             return { success: false, message: 'Anda sudah absen pulang hari ini' };
         }
-        const status = timeToMinutes(currentTime) < timeToMinutes(opHours.checkOutTime) ? 'Pulang Cepat' : 'Tepat Waktu';
+        const status = timeToMinutes(currentTime) < timeToMinutes(finalOpHours.checkOutTime) ? 'Pulang Cepat' : 'Tepat Waktu';
         
         const newLog = await AttendanceLog.create({
             studentId: student.id, studentName: student.name, studentPhotoUrl: student.photoUrl,

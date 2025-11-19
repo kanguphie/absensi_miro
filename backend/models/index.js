@@ -39,7 +39,8 @@ const Setting = sequelize.define('Setting', {
     schoolName: { type: DataTypes.STRING },
     schoolLogoUrl: { type: DataTypes.STRING },
     operatingHours: { type: DataTypes.JSON },
-    specificSchedules: { type: DataTypes.JSON }, // Added this field
+    specificSchedules: { type: DataTypes.JSON },
+    earlyDismissals: { type: DataTypes.JSON }, // Added this field for one-time schedule overrides
     holidays: { type: DataTypes.JSON },
     manualPin: { type: DataTypes.STRING, defaultValue: '123456' },
 });
