@@ -1,6 +1,7 @@
 
 
 
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -120,13 +121,20 @@ const internalRecordAttendance = async (student) => {
     if (!settingsInstance) return { success: false, message: 'System settings not configured.' };
 
     const settings = settingsInstance.get({ plain: true });
-    if (typeof settings.operatingHours === 'string') {
-        try { settings.operatingHours = JSON.parse(settings.operatingHours); }
-        catch (e) { console.error("Error parsing operatingHours:", e); settings.operatingHours = []; }
-    }
-    if (typeof settings.holidays === 'string') {
-        try { settings.holidays = JSON.parse(settings.holidays); }
-        catch(e) { console.error("Error parsing holidays:", e); settings.holidays = []; }
+    
+    // Parsing JSON fields safely
+    ['operatingHours', 'holidays', 'specificSchedules'].forEach(field => {
+        if (typeof settings[field] === 'string') {
+            try { settings[field] = JSON.parse(settings[field]); }
+            catch (e) { 
+                console.error(`Error parsing ${field}:`, e); 
+                settings[field] = (field === 'holidays' || field === 'specificSchedules') ? [] : []; 
+            }
+        }
+    });
+    // Ensure specificSchedules is array
+    if (!Array.isArray(settings.specificSchedules)) {
+        settings.specificSchedules = [];
     }
 
     const { dateObject, day, dateString: todayStr, timeString: currentTime } = getNowInWIB();
@@ -138,11 +146,32 @@ const internalRecordAttendance = async (student) => {
     const dayGroup = (day >= 1 && day <= 4) ? 'mon-thu' : (day === 5) ? 'fri' : (day === 6) ? 'sat' : null;
     if (!dayGroup) return { success: false, message: 'Absensi tidak tersedia hari ini' };
 
-    const opHours = settings.operatingHours.find(h => h.dayGroup === dayGroup);
-    if (!opHours || !opHours.enabled) return { success: false, message: 'Absensi tidak tersedia saat ini' };
+    // === LOGIC CHANGE: DETERMINE OPERATING HOURS ===
+    let opHours = null;
+    let isSpecific = false;
+
+    // 1. Check for Specific Schedule for this student's class
+    if (settings.specificSchedules && settings.specificSchedules.length > 0) {
+        // Loop through specific schedules to find one that includes the student's classId
+        const matchedSchedule = settings.specificSchedules.find(schedule => 
+            schedule.classIds && schedule.classIds.includes(student.classId)
+        );
+        
+        if (matchedSchedule) {
+            opHours = matchedSchedule.operatingHours.find(h => h.dayGroup === dayGroup);
+            isSpecific = true;
+        }
+    }
+
+    // 2. If no specific schedule found, fallback to General Schedule
+    if (!opHours) {
+        opHours = settings.operatingHours.find(h => h.dayGroup === dayGroup);
+    }
+
+    // 3. Validation
+    if (!opHours || !opHours.enabled) return { success: false, message: 'Absensi tidak tersedia saat ini untuk kelas ini' };
 
     const period = getAttendancePeriod(currentTime, opHours);
-
     if (period === 'CLOSED') return { success: false, message: 'Waktu absensi ditutup' };
 
     const startOfDay = new Date(dateObject);

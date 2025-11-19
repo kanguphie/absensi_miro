@@ -1,17 +1,103 @@
 
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
-import { SchoolSettings, OperatingHours } from '../../types';
-import { FiSave, FiPlus, FiTrash2, FiLock, FiKey } from 'react-icons/fi';
+import { useData } from '../../contexts/DataContext';
+import { SchoolSettings, OperatingHours, SpecificSchedule } from '../../types';
+import { FiSave, FiPlus, FiTrash2, FiLock, FiKey, FiClock, FiUsers, FiX } from 'react-icons/fi';
 import { api } from '../../services/api';
 
 declare const Swal: any;
 
+const initialHours: OperatingHours[] = [
+    { dayGroup: 'mon-thu', checkInTime: '07:00', lateTolerance: 15, scanInBefore: 60, checkOutTime: '13:00', scanOutBefore: 15, scanOutEndTime: '15:00', enabled: true },
+    { dayGroup: 'fri', checkInTime: '07:00', lateTolerance: 15, scanInBefore: 60, checkOutTime: '11:00', scanOutBefore: 15, scanOutEndTime: '13:00', enabled: true },
+    { dayGroup: 'sat', checkInTime: '08:00', lateTolerance: 15, scanInBefore: 45, checkOutTime: '12:00', scanOutBefore: 15, scanOutEndTime: '14:00', enabled: false },
+];
+
+const OperatingHoursEditor: React.FC<{ 
+    hours: OperatingHours[], 
+    onChange: (newHours: OperatingHours[]) => void 
+}> = ({ hours, onChange }) => {
+    
+    const handleHoursChange = (dayGroup: OperatingHours['dayGroup'], field: keyof OperatingHours, value: string | boolean) => {
+        const newHours = hours.map(h => {
+            if (h.dayGroup === dayGroup) {
+                if (field === 'lateTolerance' || field === 'scanInBefore' || field === 'scanOutBefore') {
+                    const numValue = parseInt(value as string, 10);
+                    return { ...h, [field]: isNaN(numValue) ? 0 : numValue };
+                }
+                return { ...h, [field]: value };
+            }
+            return h;
+        });
+        onChange(newHours);
+    };
+
+    return (
+        <div className="space-y-6">
+            {hours.map(op => (
+                <div key={op.dayGroup} className="border-b border-slate-200 last:border-b-0 pb-6 mb-6">
+                    <div className="flex items-center mb-4">
+                        <label className="font-semibold text-slate-800 capitalize w-32 text-lg">{op.dayGroup.replace('-', ' - ')}</label>
+                        <div className="flex items-center">
+                            <input type="checkbox" checked={op.enabled} onChange={(e) => handleHoursChange(op.dayGroup, 'enabled', e.target.checked)} className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"/>
+                            <label className="ml-2 text-sm text-slate-600">Aktif</label>
+                        </div>
+                    </div>
+                    
+                    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity ${!op.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {/* Jam Masuk */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Jam Masuk</label>
+                            <input type="time" value={op.checkInTime} onChange={e => handleHoursChange(op.dayGroup, 'checkInTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Toleransi Telat (menit)</label>
+                            <input type="number" value={op.lateTolerance} onChange={e => handleHoursChange(op.dayGroup, 'lateTolerance', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
+                        </div>
+                        <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Bisa Scan Masuk (menit sebelum)</label>
+                        <input type="number" value={op.scanInBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanInBefore', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
+                        </div>
+
+                        {/* Jam Pulang */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Jam Pulang</label>
+                            <input type="time" value={op.checkOutTime} onChange={e => handleHoursChange(op.dayGroup, 'checkOutTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Bisa Scan Pulang (menit sebelum)</label>
+                            <input type="number" value={op.scanOutBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanOutBefore', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Batas Akhir Scan Pulang</label>
+                            <input type="time" value={op.scanOutEndTime} onChange={e => handleHoursChange(op.dayGroup, 'scanOutEndTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 const SettingsPage: React.FC = () => {
   const { settings, loading, updateSettings } = useSettings();
+  const { classes } = useData();
   const [formState, setFormState] = useState<SchoolSettings | null>(null);
   const [newHoliday, setNewHoliday] = useState('');
+  const [activeTab, setActiveTab] = useState<'general' | 'specific'>('general');
   
+  // Specific Schedule Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<SpecificSchedule | null>(null);
+  const [scheduleName, setScheduleName] = useState('');
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [scheduleHours, setScheduleHours] = useState<OperatingHours[]>(JSON.parse(JSON.stringify(initialHours)));
+
   // Password change state
   const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -28,20 +114,8 @@ const SettingsPage: React.FC = () => {
     }
   };
   
-  const handleHoursChange = (dayGroup: OperatingHours['dayGroup'], field: keyof OperatingHours, value: string | boolean) => {
-      if (formState) {
-          const newHours = formState.operatingHours.map(h => {
-              if (h.dayGroup === dayGroup) {
-                  if (field === 'lateTolerance' || field === 'scanInBefore' || field === 'scanOutBefore') {
-                      const numValue = parseInt(value as string, 10);
-                      return { ...h, [field]: isNaN(numValue) ? 0 : numValue };
-                  }
-                  return { ...h, [field]: value };
-              }
-              return h;
-          });
-          setFormState({...formState, operatingHours: newHours});
-      }
+  const handleGeneralHoursChange = (newHours: OperatingHours[]) => {
+      if(formState) setFormState({...formState, operatingHours: newHours});
   }
 
   const handleAddHoliday = () => {
@@ -64,6 +138,59 @@ const SettingsPage: React.FC = () => {
           });
       }
   };
+  
+  // --- Specific Schedule Logic ---
+  const openScheduleModal = (schedule?: SpecificSchedule) => {
+      if (schedule) {
+          setEditingSchedule(schedule);
+          setScheduleName(schedule.name);
+          setSelectedClasses(schedule.classIds);
+          setScheduleHours(schedule.operatingHours);
+      } else {
+          setEditingSchedule(null);
+          setScheduleName('');
+          setSelectedClasses([]);
+          setScheduleHours(JSON.parse(JSON.stringify(initialHours)));
+      }
+      setIsModalOpen(true);
+  }
+
+  const toggleClassSelection = (classId: string) => {
+      setSelectedClasses(prev => prev.includes(classId) ? prev.filter(id => id !== classId) : [...prev, classId]);
+  }
+
+  const saveSpecificSchedule = () => {
+      if (!scheduleName.trim()) { Swal.fire('Error', 'Nama jadwal wajib diisi', 'error'); return; }
+      if (selectedClasses.length === 0) { Swal.fire('Error', 'Pilih minimal satu kelas', 'error'); return; }
+      
+      if (formState) {
+          const newSchedule: SpecificSchedule = {
+              id: editingSchedule ? editingSchedule.id : Date.now().toString(),
+              name: scheduleName,
+              classIds: selectedClasses,
+              operatingHours: scheduleHours
+          };
+
+          // Deep copy to ensure reactivity
+          let updatedSchedules = formState.specificSchedules ? [...formState.specificSchedules] : [];
+          
+          if (editingSchedule) {
+              updatedSchedules = updatedSchedules.map(s => s.id === editingSchedule.id ? newSchedule : s);
+          } else {
+              updatedSchedules = [...updatedSchedules, newSchedule];
+          }
+          
+          setFormState({...formState, specificSchedules: updatedSchedules});
+          setIsModalOpen(false);
+      }
+  }
+
+  const deleteSpecificSchedule = (id: string) => {
+      if (formState) {
+          const updatedSchedules = formState.specificSchedules ? formState.specificSchedules.filter(s => s.id !== id) : [];
+          setFormState({...formState, specificSchedules: updatedSchedules});
+      }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +212,6 @@ const SettingsPage: React.FC = () => {
           Swal.fire('Error', 'Konfirmasi password baru tidak sesuai.', 'error');
           return;
       }
-      
       try {
           const result = await api.changePassword(passwords.current, passwords.new);
           if (result.success) {
@@ -166,50 +292,69 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Operating Hours */}
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                <h2 className="text-xl font-bold text-slate-800 mb-4">Jam Operasional</h2>
-                    {formState.operatingHours.map(op => (
-                        <div key={op.dayGroup} className="border-b border-slate-200 last:border-b-0 pb-6 mb-6">
-                            <div className="flex items-center mb-4">
-                                <label className="font-semibold text-slate-800 capitalize w-32 text-lg">{op.dayGroup.replace('-', ' - ')}</label>
-                                <div className="flex items-center">
-                                    <input type="checkbox" checked={op.enabled} onChange={(e) => handleHoursChange(op.dayGroup, 'enabled', e.target.checked)} className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"/>
-                                    <label className="ml-2 text-sm text-slate-600">Aktif</label>
-                                </div>
+                {/* Operating Hours with Tabs */}
+                <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="flex border-b border-slate-200">
+                        <button 
+                            type="button"
+                            onClick={() => setActiveTab('general')} 
+                            className={`flex-1 py-4 px-6 text-sm font-medium focus:outline-none ${activeTab === 'general' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                        >
+                            <div className="flex items-center justify-center">
+                                <FiClock className="mr-2" /> Jadwal Umum
                             </div>
-                            
-                            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity ${!op.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                                {/* Jam Masuk */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Jam Masuk</label>
-                                    <input type="time" value={op.checkInTime} onChange={e => handleHoursChange(op.dayGroup, 'checkInTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Toleransi Telat (menit)</label>
-                                    <input type="number" value={op.lateTolerance} onChange={e => handleHoursChange(op.dayGroup, 'lateTolerance', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
-                                </div>
-                                <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Bisa Scan Masuk (menit sebelum)</label>
-                                <input type="number" value={op.scanInBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanInBefore', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
-                                </div>
-
-                                {/* Jam Pulang */}
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Jam Pulang</label>
-                                    <input type="time" value={op.checkOutTime} onChange={e => handleHoursChange(op.dayGroup, 'checkOutTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Bisa Scan Pulang (menit sebelum)</label>
-                                    <input type="number" value={op.scanOutBefore} onChange={e => handleHoursChange(op.dayGroup, 'scanOutBefore', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Batas Akhir Scan Pulang</label>
-                                    <input type="time" value={op.scanOutEndTime} onChange={e => handleHoursChange(op.dayGroup, 'scanOutEndTime', e.target.value)} disabled={!op.enabled} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:cursor-not-allowed"/>
-                                </div>
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setActiveTab('specific')} 
+                            className={`flex-1 py-4 px-6 text-sm font-medium focus:outline-none ${activeTab === 'specific' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+                        >
+                            <div className="flex items-center justify-center">
+                                <FiUsers className="mr-2" /> Jadwal Khusus (Per Kelas)
                             </div>
-                        </div>
-                    ))}
+                        </button>
+                    </div>
+                    
+                    <div className="p-6">
+                        {activeTab === 'general' ? (
+                            <div>
+                                <p className="text-slate-500 mb-6 text-sm">Jadwal ini berlaku untuk semua kelas yang <strong>tidak</strong> memiliki jadwal khusus.</p>
+                                <OperatingHoursEditor hours={formState.operatingHours} onChange={handleGeneralHoursChange} />
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="flex justify-between items-center mb-6">
+                                    <p className="text-slate-500 text-sm">Buat jadwal berbeda untuk kelas tertentu (misal: Kelas 1 & 2 pulang lebih awal).</p>
+                                    <button type="button" onClick={() => openScheduleModal()} className="bg-indigo-600 text-white text-sm font-bold py-2 px-3 rounded-lg hover:bg-indigo-700 flex items-center"><FiPlus className="mr-1"/> Tambah Jadwal</button>
+                                </div>
+                                
+                                {formState.specificSchedules && formState.specificSchedules.length > 0 ? (
+                                    <div className="space-y-4">
+                                        {formState.specificSchedules.map(schedule => (
+                                            <div key={schedule.id} className="border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h3 className="font-bold text-lg text-slate-800">{schedule.name}</h3>
+                                                        <p className="text-sm text-slate-600 mt-1">
+                                                            Kelas: {schedule.classIds.map(id => classes.find(c => c.id === id)?.name).join(', ') || 'Belum ada kelas'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex space-x-2">
+                                                        <button type="button" onClick={() => openScheduleModal(schedule)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Edit</button>
+                                                        <button type="button" onClick={() => deleteSpecificSchedule(schedule.id)} className="text-red-500 hover:text-red-700 text-sm font-medium">Hapus</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-10 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                                        <p className="text-slate-500">Belum ada jadwal khusus.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
             
@@ -241,6 +386,56 @@ const SettingsPage: React.FC = () => {
             </button>
         </div>
       </form>
+      
+      {/* Modal for Specific Schedule */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+                <div className="flex justify-between items-center p-5 border-b border-slate-200">
+                    <h2 className="text-xl font-bold text-slate-800">{editingSchedule ? 'Edit Jadwal Khusus' : 'Tambah Jadwal Khusus'}</h2>
+                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><FiX size={24}/></button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto">
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nama Jadwal (misal: Kelas Bawah)</label>
+                        <input 
+                            type="text" 
+                            value={scheduleName} 
+                            onChange={e => setScheduleName(e.target.value)} 
+                            className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Contoh: Kelas 1 & 2"
+                        />
+                    </div>
+                    
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Pilih Kelas</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {classes.map(cls => (
+                                <div 
+                                    key={cls.id} 
+                                    onClick={() => toggleClassSelection(cls.id)}
+                                    className={`cursor-pointer p-3 rounded-lg border text-center transition-colors ${selectedClasses.includes(cls.id) ? 'bg-indigo-100 border-indigo-500 text-indigo-700 font-bold' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}
+                                >
+                                    {cls.name}
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">* Kelas yang dipilih akan mengikuti jam operasional di bawah ini, bukan jadwal umum.</p>
+                    </div>
+                    
+                    <hr className="my-6 border-slate-200"/>
+                    
+                    <OperatingHoursEditor hours={scheduleHours} onChange={setScheduleHours} />
+                </div>
+                
+                <div className="flex justify-end space-x-3 p-5 border-t border-slate-200 bg-slate-50 rounded-b-lg">
+                    <button onClick={() => setIsModalOpen(false)} className="bg-white border border-slate-300 text-slate-800 font-bold py-2 px-4 rounded-lg hover:bg-slate-100 transition-colors">Batal</button>
+                    <button onClick={saveSpecificSchedule} className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center transition-colors">Simpan Jadwal</button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

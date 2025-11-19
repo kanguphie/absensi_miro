@@ -50,10 +50,18 @@ export interface OperatingHours {
   enabled: boolean;
 }
 
+export interface SpecificSchedule {
+  id: string;
+  name: string; // e.g. "Kelas 1 & 2"
+  classIds: string[]; // IDs of classes that follow this schedule
+  operatingHours: OperatingHours[];
+}
+
 export interface SchoolSettings {
   schoolName: string;
   schoolLogoUrl: string;
-  operatingHours: OperatingHours[];
+  operatingHours: OperatingHours[]; // Default/General Schedule
+  specificSchedules: SpecificSchedule[]; // Override for specific classes
   holidays: string[];
   manualPin?: string; // PIN for protecting manual attendance page
 }

@@ -1,4 +1,6 @@
 
+
+
 import { Student, SchoolClass, AttendanceLog, SchoolSettings, User, AttendanceStatus } from '../types';
 
 const API_BASE_URL = 'https://apimiro.madarussalamsubah.id/api';
@@ -24,22 +26,18 @@ const handleResponse = async (response: Response) => {
 
 const parseSettings = (settings: any): SchoolSettings => {
     if (settings) {
-        if (typeof settings.operatingHours === 'string') {
-            try {
-                settings.operatingHours = JSON.parse(settings.operatingHours);
-            } catch (e) {
-                console.error("Failed to parse operatingHours", e);
-                settings.operatingHours = []; // fallback to empty array
+        ['operatingHours', 'holidays', 'specificSchedules'].forEach(field => {
+             if (typeof settings[field] === 'string') {
+                try {
+                    settings[field] = JSON.parse(settings[field]);
+                } catch (e) {
+                    console.error(`Failed to parse ${field}`, e);
+                    settings[field] = []; // fallback to empty array
+                }
             }
-        }
-        if (typeof settings.holidays === 'string') {
-            try {
-                settings.holidays = JSON.parse(settings.holidays);
-            } catch (e) {
-                console.error("Failed to parse holidays", e);
-                settings.holidays = []; // fallback
-            }
-        }
+        });
+        // Ensure specificSchedules is initialized if missing from older DB records
+        if (!settings.specificSchedules) settings.specificSchedules = [];
     }
     return settings;
 };
