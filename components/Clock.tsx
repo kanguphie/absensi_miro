@@ -1,3 +1,4 @@
+
 import React from 'react';
 import useClock from '../hooks/useClock';
 
@@ -20,10 +21,11 @@ const Clock: React.FC = () => {
 
   return (
     <div className="text-center">
-      <h1 className="text-8xl md:text-9xl font-extrabold tracking-tighter tabular-nums text-gray-800" style={{textShadow: '0 4px 12px rgba(0,0,0,0.1)'}}>
+      {/* Updated color to dark red/maroon based on the screenshot */}
+      <h1 className="text-8xl md:text-9xl font-extrabold tracking-tighter tabular-nums text-[#7f1d1d]" style={{textShadow: '0 4px 12px rgba(0,0,0,0.05)'}}>
         {timeString}
       </h1>
-      <p className="text-2xl md:text-3xl mt-2 text-gray-600">{dateString}</p>
+      <p className="text-2xl md:text-3xl mt-2 text-slate-600 font-medium">{dateString}</p>
     </div>
   );
 };

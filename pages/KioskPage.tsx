@@ -149,41 +149,47 @@ const KioskPage: React.FC = () => {
   
   const recentLogs = attendanceLogs.slice(0, 10);
 
+  // Determine Status Pill Color based on the screenshot vibe
+  // Scan Masuk/Pulang are bright/gradient. Ditutup is a muted pastel red.
+  const getStatusPillStyle = (period: string) => {
+      switch(period) {
+          case 'SCAN MASUK': return 'bg-gradient-to-r from-emerald-400 to-teal-500 text-white shadow-emerald-200/50';
+          case 'SCAN PULANG': return 'bg-gradient-to-r from-blue-400 to-indigo-500 text-white shadow-blue-200/50';
+          default: return 'bg-[#cf8e8e] text-white animate-none shadow-red-200/50'; // Pastel Red for Closed
+      }
+  };
+
   return (
-    <div className="bg-gradient-to-br from-sky-100 via-indigo-100 to-purple-200 min-h-screen flex flex-col overflow-hidden relative">
+    <div className="bg-gradient-to-br from-slate-50 via-cyan-100 to-teal-200 min-h-screen flex flex-col overflow-hidden relative">
       <div className="flex flex-col lg:flex-row text-gray-800 font-sans p-4 sm:p-6 lg:p-8 flex-1 pb-16">
         {/* Main Content */}
         <div className="flex-1 flex flex-col justify-center items-center p-4">
           <div className="text-center w-full max-w-2xl">
-            <div className="flex items-center justify-center mx-auto mb-4">
-                <img src={settings?.schoolLogoUrl} alt="Logo Sekolah" className="h-16 w-16 rounded-full bg-white p-1 shadow-md"/>
+            <div className="flex items-center justify-center mx-auto mb-6">
+                <img src={settings?.schoolLogoUrl} alt="Logo Sekolah" className="h-20 w-20 rounded-full bg-white p-1.5 shadow-lg object-contain"/>
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900">{settings?.schoolName || 'Sistem Absensi'}</h1>
-            <p className="text-lg text-gray-600 mt-2">Selamat Datang! Silakan tempelkan kartu RFID Anda.</p>
+            <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">{settings?.schoolName || 'Sistem Absensi'}</h1>
+            <p className="text-lg text-slate-600 mt-3 font-medium">Selamat Datang! Silakan tempelkan kartu RFID Anda.</p>
           </div>
           
-          <div className="my-8 w-full max-w-2xl text-center">
+          <div className="my-10 w-full max-w-2xl text-center">
             <Clock />
-            <div className="mt-6 bg-white/50 backdrop-blur-sm px-6 py-4 rounded-xl shadow-lg border border-white/30 min-h-[80px] flex items-center justify-center">
+            <div className="mt-8 bg-cyan-50/50 backdrop-blur-md px-6 py-6 rounded-2xl shadow-lg border border-cyan-100 min-h-[100px] flex items-center justify-center">
               {lastScannedRfid ? (
                 <div className="animate-fade-in text-center">
-                  <p className="text-gray-600 font-semibold text-sm">KARTU RFID TERBACA</p>
-                  <p className="mt-1 text-3xl font-mono tracking-widest text-gray-800">
+                  <p className="text-teal-600 font-semibold text-sm uppercase tracking-widest mb-1">Kartu Terbaca</p>
+                  <p className="text-4xl font-mono tracking-widest text-slate-800">
                     {lastScannedRfid}
                   </p>
                 </div>
               ) : (
-                <p className="text-2xl text-gray-500 italic">Menunggu Scan...</p>
+                <p className="text-2xl text-slate-400 italic font-light">Menunggu Scan...</p>
               )}
             </div>
           </div>
 
           <div className="relative w-full max-w-lg">
-            <div className={`text-xl font-bold tracking-wider text-white text-center py-4 px-10 rounded-full transition-all duration-500 animate-pulse shadow-2xl ${
-                attendancePeriod === 'SCAN MASUK' ? 'bg-gradient-to-r from-green-400 to-emerald-600' :
-                attendancePeriod === 'SCAN PULANG' ? 'bg-gradient-to-r from-indigo-500 to-blue-600' :
-                'bg-gradient-to-r from-rose-500 to-red-600 animate-none'
-            }`}>
+            <div className={`text-xl font-bold tracking-widest uppercase text-center py-4 px-10 rounded-full transition-all duration-500 shadow-xl ${getStatusPillStyle(attendancePeriod)}`}>
               {attendancePeriod}
             </div>
             <form onSubmit={handleSubmit} className="absolute -top-96">
@@ -202,43 +208,50 @@ const KioskPage: React.FC = () => {
         </div>
 
         {/* Sidebar - Recent Activity */}
-        <div className="w-full lg:w-96 lg:ml-8 mt-8 lg:mt-0 bg-white/40 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-lg flex flex-col h-[calc(100vh-8rem)]">
-          <div className="flex-shrink-0 grid grid-cols-2 gap-3 mb-4">
-              <Link to="/manual" className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-2 px-3 rounded-lg flex items-center justify-center transition-colors shadow-sm text-sm">
+        <div className="w-full lg:w-96 lg:ml-8 mt-8 lg:mt-0 bg-white/40 backdrop-blur-xl rounded-3xl p-6 border border-white/50 shadow-xl flex flex-col h-[calc(100vh-8rem)]">
+          <div className="flex-shrink-0 grid grid-cols-2 gap-3 mb-6">
+              <Link to="/manual" className="bg-white/80 border border-teal-100 text-teal-700 hover:bg-white font-bold py-2.5 px-3 rounded-xl flex items-center justify-center transition-all shadow-sm hover:shadow text-sm">
                   <FiEdit className="mr-2" />
                   Absen Manual
               </Link>
-              <Link to="/login" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center transition-colors shadow-md text-sm">
+              <Link to="/login" className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-3 rounded-xl flex items-center justify-center transition-all shadow-md hover:shadow-lg text-sm">
                   <FiArrowRight className="mr-2" />
                   Admin Panel
               </Link>
           </div>
 
-          <h2 className="flex-shrink-0 text-2xl font-bold mb-4 flex items-center text-gray-900"><FiActivity className="mr-3 text-indigo-500" />Aktivitas Terakhir</h2>
-          <div className="flex-1 space-y-3 overflow-y-auto pr-2 -mr-4 custom-scrollbar">
+          <h2 className="flex-shrink-0 text-xl font-bold mb-4 flex items-center text-slate-800">
+            <FiActivity className="mr-2 text-teal-600" />
+            Aktivitas Terakhir
+          </h2>
+          <div className="flex-1 space-y-3 overflow-y-auto pr-2 -mr-2 custom-scrollbar">
             {recentLogs.length > 0 ? recentLogs.map((log) => (
-              <div key={log.id} className="flex items-center p-3 bg-white/60 backdrop-blur-sm rounded-xl shadow-md border border-white/30">
-                <img src={log.studentPhotoUrl} alt={log.studentName} className="w-12 h-12 rounded-full object-cover mr-4 border-2 border-white"/>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-800">{log.studentName}</p>
-                  <p className="text-sm text-gray-500">{log.className}</p>
+              <div key={log.id} className="flex items-center p-3 bg-white/60 backdrop-blur-sm rounded-2xl shadow-sm border border-white/40 hover:bg-white/80 transition-colors">
+                <img src={log.studentPhotoUrl} alt={log.studentName} className="w-10 h-10 rounded-full object-cover mr-3 border-2 border-white shadow-sm"/>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-800 truncate text-sm">{log.studentName}</p>
+                  <p className="text-xs text-slate-500 truncate">{log.className}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-600">{new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full mt-1 inline-block ${log.type === 'in' ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'}`}>
+                <div className="text-right pl-2">
+                  <p className="text-xs font-bold text-slate-600 font-mono">{new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+                  <span className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-full mt-1 inline-block ${log.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                     {log.type === 'in' ? 'Masuk' : 'Pulang'}
                   </span>
                 </div>
               </div>
-            )) : <p className="text-gray-500 text-center pt-8">Belum ada aktivitas hari ini.</p>}
+            )) : (
+                <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+                    <p>Belum ada aktivitas.</p>
+                </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Running Text Footer */}
       {settings?.runningText && (
-        <div className="fixed bottom-0 left-0 right-0 bg-indigo-900 text-white overflow-hidden py-3 z-50 shadow-lg border-t border-indigo-700">
-          <div className="animate-marquee whitespace-nowrap font-semibold text-xl tracking-wide">
+        <div className="fixed bottom-0 left-0 right-0 bg-teal-800 text-teal-50 overflow-hidden py-3 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] border-t border-teal-700">
+          <div className="animate-marquee whitespace-nowrap font-semibold text-lg tracking-wide">
             {settings.runningText}
           </div>
         </div>

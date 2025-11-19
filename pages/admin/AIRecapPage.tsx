@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { useData } from '../../contexts/DataContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { AttendanceStatus } from '../../types';
-import { FiSend, FiBot, FiUser, FiLoader, FiTrash2, FiDatabase } from 'react-icons/fi';
+import { FiSend, FiCpu, FiUser, FiTrash2, FiDatabase } from 'react-icons/fi';
 
 const toLocalISOString = (date: Date) => {
     const tzoffset = date.getTimezoneOffset() * 60000;
@@ -159,7 +159,7 @@ const AIRecapPage: React.FC = () => {
         <div className="animate-fade-in h-[calc(100vh-140px)] flex flex-col">
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
-                    <FiBot className="text-indigo-600" />
+                    <FiCpu className="text-indigo-600" />
                     Asisten Data AI
                 </h1>
                 <button 
@@ -180,7 +180,7 @@ const AIRecapPage: React.FC = () => {
                         >
                             <div className={`flex max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                                 <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center mx-2 ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'}`}>
-                                    {msg.role === 'user' ? <FiUser size={16}/> : <FiBot size={16}/>}
+                                    {msg.role === 'user' ? <FiUser size={16}/> : <FiCpu size={16}/>}
                                 </div>
                                 <div 
                                     className={`p-3 rounded-2xl shadow-sm text-sm ${
@@ -205,7 +205,7 @@ const AIRecapPage: React.FC = () => {
                         <div className="flex justify-start">
                             <div className="flex max-w-[80%] flex-row">
                                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-2">
-                                    <FiBot size={16}/>
+                                    <FiCpu size={16}/>
                                 </div>
                                 <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm border border-slate-200 flex items-center gap-1">
                                     <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
