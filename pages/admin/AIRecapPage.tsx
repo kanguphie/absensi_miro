@@ -260,36 +260,31 @@ const AIRecapPage: React.FC = () => {
                 </div>
 
                 {/* Input Area */}
-                <div className="p-4 bg-white border-t border-slate-200">
-                    <form onSubmit={handleSend} className="flex gap-2 relative">
-                        <div className="absolute -top-8 left-0 bg-indigo-50 text-indigo-700 text-xs px-3 py-1 rounded-full border border-indigo-100 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity cursor-help select-none">
-                            <FiDatabase size={12} />
-                            <span>Konteks: {students.length} Siswa | {attendanceLogs.length} Log Absensi</span>
+                <div className="p-5 bg-white border-t border-slate-200">
+                    <form onSubmit={handleSend} className="relative">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Tanya tentang data absensi... (Contoh: 'Siapa yang paling sering terlambat?')"
+                                className={`w-full border ${!process.env.API_KEY ? 'border-red-300 bg-red-50 focus:ring-red-200' : 'border-slate-300 focus:ring-indigo-500'} rounded-xl px-4 py-3 pr-14 focus:outline-none focus:ring-2 transition-all shadow-sm text-slate-800 placeholder-slate-400`}
+                                disabled={isTyping}
+                            />
+                            <button 
+                                type="submit" 
+                                disabled={!input.trim() || isTyping}
+                                className="absolute right-2 top-1.5 bottom-1.5 bg-indigo-600 text-white px-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center shadow-sm aspect-square"
+                            >
+                                {isTyping ? <FiCpu className="animate-spin" /> : <FiSend />}
+                            </button>
                         </div>
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Tanya tentang data absensi... (Contoh: 'Siapa yang paling sering terlambat?')"
-                            className="flex-1 border border-slate-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-400"
-                            disabled={isTyping}
-                        />
-                        <button 
-                            type="submit" 
-                            disabled={!input.trim() || isTyping}
-                            className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-semibold flex items-center shadow-sm"
-                        >
-                            <FiSend className="mr-2" /> Kirim
-                        </button>
                     </form>
                     { !process.env.API_KEY && (
-                        <div className="mt-3 bg-amber-50 text-amber-700 text-xs p-3 rounded-lg border border-amber-100 flex items-start">
-                            <FiInfo className="mr-2 mt-0.5 flex-shrink-0" size={14} />
-                            <div>
-                                <strong>API Key Belum Ditemukan</strong><br/>
-                                Buat file <code>.env</code> di root project dan tambahkan: <code>API_KEY=AIzaSy...</code>
-                            </div>
-                        </div>
+                        <p className="text-red-500 text-xs mt-2 flex items-center font-medium">
+                            <FiAlertTriangle className="mr-1.5" size={14} />
+                            API Key belum terdeteksi. Fitur ini mungkin tidak berfungsi.
+                        </p>
                     )}
                 </div>
             </div>
