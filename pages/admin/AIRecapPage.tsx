@@ -4,13 +4,14 @@ import { GoogleGenAI } from "@google/genai";
 import { useData } from '../../contexts/DataContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { AttendanceStatus } from '../../types';
-import { FiSend, FiCpu, FiUser, FiTrash2, FiDatabase, FiAlertTriangle } from 'react-icons/fi';
+import { FiSend, FiCpu, FiUser, FiTrash2, FiDatabase, FiAlertTriangle, FiInfo } from 'react-icons/fi';
 
 interface ChatMessage {
     id: string;
     role: 'user' | 'model';
     text: string;
     timestamp: Date;
+    isError?: boolean;
 }
 
 const statusMap: { [key in AttendanceStatus]: string } = {
@@ -68,10 +69,11 @@ const AIRecapPage: React.FC = () => {
 
         // 2. Context Info
         const contextInfo = `
-        Current Date: ${today.toLocaleDateString('id-ID')}
+        Current Date: ${today.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         School Name: ${settings?.schoolName}
         Total Students: ${students.length}
         Classes: ${classes.map(c => c.name).join(', ')}
+        Attendance Codes: H=Hadir(Present), T=Terlambat(Late), S=Sakit(Sick), I=Izin(Permit), A=Alfa(Absent), PC=Pulang Cepat(Early Leave)
         `;
 
         return `
@@ -81,7 +83,7 @@ const AIRecapPage: React.FC = () => {
         === SCHOOL CONTEXT ===
         ${contextInfo}
         
-        === STUDENT DATA (CURRENT MONTH STATS: H=Hadir, T=Terlambat, S=Sakit, I=Izin, A=Alfa, PC=Pulang Cepat) ===
+        === STUDENT DATA (CURRENT MONTH STATS) ===
         ${studentSummary}
         
         === INSTRUCTIONS ===
@@ -89,7 +91,8 @@ const AIRecapPage: React.FC = () => {
         2. Be professional, concise, and helpful.
         3. You can perform analysis like ranking (who is most late), counting (how many sick today), or summarizing class performance.
         4. If asked about data not present (e.g., grades, phone numbers), politely say you only have access to attendance data.
-        5. Format your response nicely (use Markdown for lists, bold text, etc.).
+        5. Format your response nicely (use Markdown for lists, bold text, tables if necessary).
+        6. When summarizing, mention the specific numbers.
         `;
     };
 
@@ -102,8 +105,9 @@ const AIRecapPage: React.FC = () => {
              const errorMsg: ChatMessage = {
                 id: Date.now().toString(),
                 role: 'model',
-                text: "⚠️ **API Key belum dikonfigurasi.**\n\nMohon tambahkan `API_KEY` ke dalam environment variables project Anda agar fitur ini dapat berfungsi.",
-                timestamp: new Date()
+                text: "⚠️ **API Key belum dikonfigurasi.**\n\nMohon tambahkan `API_KEY` ke dalam file `.env` di root project Anda, lalu restart server.\n\nContoh: `API_KEY=AIzaSy...`",
+                timestamp: new Date(),
+                isError: true
             };
             setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: input, timestamp: new Date() }, errorMsg]);
             setInput('');
@@ -125,9 +129,9 @@ const AIRecapPage: React.FC = () => {
             const systemPrompt = buildSystemPrompt();
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
             
-            // Construct history without the initial welcome message (as it is client-side only)
+            // Construct history: Remove welcome message and any error messages
             const history = messages
-                .filter(m => m.id !== 'welcome')
+                .filter(m => m.id !== 'welcome' && !m.isError)
                 .map(m => ({
                     role: m.role,
                     parts: [{ text: m.text }]
@@ -157,14 +161,17 @@ const AIRecapPage: React.FC = () => {
             let errorText = "Maaf, terjadi kesalahan saat menghubungi layanan AI.";
             
             if (error.message?.includes('API key')) {
-                errorText = "Kunci API tidak valid atau kedaluwarsa. Mohon periksa konfigurasi Anda.";
+                errorText = "⚠️ **API Key tidak valid.** Mohon periksa kembali API Key Anda di file `.env`.";
+            } else if (error.message?.includes('quota')) {
+                errorText = "⚠️ **Kuota API habis.** Mohon coba lagi nanti.";
             }
 
             const errorMessage: ChatMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
                 text: errorText,
-                timestamp: new Date()
+                timestamp: new Date(),
+                isError: true
             };
             setMessages(prev => [...prev, errorMessage]);
         } finally {
@@ -198,23 +205,37 @@ const AIRecapPage: React.FC = () => {
                             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                             <div className={`flex max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center mx-2 ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white'}`}>
-                                    {msg.role === 'user' ? <FiUser size={16}/> : <FiCpu size={16}/>}
+                                <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center mx-2 ${
+                                    msg.isError 
+                                        ? 'bg-red-100 text-red-600' 
+                                        : msg.role === 'user' 
+                                            ? 'bg-indigo-600 text-white' 
+                                            : 'bg-emerald-600 text-white'
+                                }`}>
+                                    {msg.isError ? <FiAlertTriangle size={16}/> : (msg.role === 'user' ? <FiUser size={16}/> : <FiCpu size={16}/>)}
                                 </div>
                                 <div 
                                     className={`p-3.5 rounded-2xl shadow-sm text-sm leading-relaxed ${
-                                        msg.role === 'user' 
-                                        ? 'bg-indigo-600 text-white rounded-tr-none' 
-                                        : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
+                                        msg.isError
+                                        ? 'bg-red-50 text-red-800 border border-red-200 rounded-tl-none'
+                                        : msg.role === 'user' 
+                                            ? 'bg-indigo-600 text-white rounded-tr-none' 
+                                            : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
                                     }`}
                                 >
                                     <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{
                                         __html: msg.text
                                           .replace(/\n/g, '<br/>')
                                           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                          .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-red-500 font-mono text-xs">$1</code>')
+                                          .replace(/`([^`]+)`/g, '<code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono text-xs border border-slate-200">$1</code>')
                                     }} />
-                                    <span className={`text-[10px] mt-2 block ${msg.role === 'user' ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                    <span className={`text-[10px] mt-2 block ${
+                                        msg.isError 
+                                        ? 'text-red-400' 
+                                        : msg.role === 'user' 
+                                            ? 'text-indigo-200' 
+                                            : 'text-slate-400'
+                                    }`}>
                                         {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                     </span>
                                 </div>
@@ -241,7 +262,7 @@ const AIRecapPage: React.FC = () => {
                 {/* Input Area */}
                 <div className="p-4 bg-white border-t border-slate-200">
                     <form onSubmit={handleSend} className="flex gap-2 relative">
-                        <div className="absolute -top-8 left-0 bg-indigo-50 text-indigo-700 text-xs px-3 py-1 rounded-full border border-indigo-100 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity cursor-help">
+                        <div className="absolute -top-8 left-0 bg-indigo-50 text-indigo-700 text-xs px-3 py-1 rounded-full border border-indigo-100 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity cursor-help select-none">
                             <FiDatabase size={12} />
                             <span>Konteks: {students.length} Siswa | {attendanceLogs.length} Log Absensi</span>
                         </div>
@@ -262,9 +283,12 @@ const AIRecapPage: React.FC = () => {
                         </button>
                     </form>
                     { !process.env.API_KEY && (
-                        <div className="mt-2 text-xs text-red-500 flex items-center">
-                            <FiAlertTriangle className="mr-1" />
-                            API Key belum terdeteksi. Fitur ini mungkin tidak berfungsi.
+                        <div className="mt-3 bg-amber-50 text-amber-700 text-xs p-3 rounded-lg border border-amber-100 flex items-start">
+                            <FiInfo className="mr-2 mt-0.5 flex-shrink-0" size={14} />
+                            <div>
+                                <strong>API Key Belum Ditemukan</strong><br/>
+                                Buat file <code>.env</code> di root project dan tambahkan: <code>API_KEY=AIzaSy...</code>
+                            </div>
                         </div>
                     )}
                 </div>
