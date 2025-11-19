@@ -1,7 +1,11 @@
 
 import { Student, SchoolClass, AttendanceLog, SchoolSettings, User, AttendanceStatus } from '../types';
 
-const API_BASE_URL = 'https://apimiro.madarussalamsubah.id/api';
+// Determine API URL based on environment
+// Checks if the app is running on localhost or 127.0.0.1
+const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3004/api' 
+  : 'https://apimiro.madarussalamsubah.id/api';
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('authToken');

@@ -264,7 +264,24 @@ router.get('/settings', async (req, res) => {
         });
         res.json(setting);
     } catch (error) {
-        console.error("Error fetching settings:", error);
+        console.error("Error fetching settings (Attempt 1):", error);
+        
+        // Self-Healing: If first attempt fails (likely due to missing column/schema mismatch),
+        // attempt to sync the Setting model and retry.
+        try {
+            console.log("Attempting to sync Setting model...");
+            await Setting.sync({ alter: true });
+            
+            const [setting] = await Setting.findOrCreate({
+                where: { id: 1 },
+                defaults: initialSettings
+            });
+            console.log("Self-healing successful, settings returned.");
+            return res.json(setting);
+        } catch (retryError) {
+             console.error("Retry failed:", retryError);
+        }
+
         res.status(500).json({ message: "Gagal memuat pengaturan dari database." });
     }
 });

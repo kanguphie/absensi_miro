@@ -68,6 +68,7 @@ export interface EarlyDismissal {
 export interface SchoolSettings {
   schoolName: string;
   schoolLogoUrl: string;
+  runningText?: string; // New field for marquee text
   operatingHours: OperatingHours[]; // Default/General Schedule
   specificSchedules: SpecificSchedule[]; // Override for specific classes
   earlyDismissals: EarlyDismissal[]; // One-time overrides (Highest Priority)

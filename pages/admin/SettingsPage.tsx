@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useData } from '../../contexts/DataContext';
 import { SchoolSettings, OperatingHours, SpecificSchedule, EarlyDismissal } from '../../types';
-import { FiSave, FiPlus, FiTrash2, FiLock, FiKey, FiClock, FiUsers, FiX, FiAlertTriangle, FiCalendar } from 'react-icons/fi';
+import { FiSave, FiPlus, FiTrash2, FiLock, FiKey, FiClock, FiUsers, FiX, FiAlertTriangle, FiType } from 'react-icons/fi';
 import { api } from '../../services/api';
 
 declare const Swal: any;
@@ -111,7 +111,7 @@ const SettingsPage: React.FC = () => {
     }
   }, [settings]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (formState) {
       setFormState({ ...formState, [e.target.name]: e.target.value });
     }
@@ -298,6 +298,20 @@ const SettingsPage: React.FC = () => {
                         <input type="text" name="schoolLogoUrl" id="schoolLogoUrl" value={formState.schoolLogoUrl} onChange={handleInputChange}
                             className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label htmlFor="runningText" className="block text-sm font-medium text-slate-700 mb-1">
+                                <span className="flex items-center"><FiType className="mr-1"/> Teks Berjalan (Running Text) di Kiosk</span>
+                            </label>
+                            <textarea
+                                name="runningText"
+                                id="runningText"
+                                value={formState.runningText || ''}
+                                onChange={handleInputChange}
+                                rows={3}
+                                className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                placeholder="Masukkan teks yang akan berjalan di halaman kiosk..."
+                            />
                         </div>
                     </div>
                 </div>

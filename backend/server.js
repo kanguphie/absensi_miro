@@ -10,7 +10,6 @@ const app = express();
 
 // Middleware
 // Updated CORS configuration to explicitly allow requests from any origin.
-// This is necessary for the frontend hosted on AI Studio to communicate with this backend.
 app.use(cors({
   origin: '*', // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow common methods
@@ -23,7 +22,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', apiRoutes);
 
 // Serve frontend static files
-// This assumes you build your React app and place the 'dist' folder here
 app.use(express.static(path.join(__dirname, '..', 'dist')));
 
 app.get('*', (req, res) => {
@@ -33,23 +31,38 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3004;
 
 const startServer = async () => {
+    // 1. Start HTTP Server immediately so aaPanel sees the process as "Running"
+    const server = app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+
+    // 2. Attempt Database Connection asynchronously
     try {
         await sequelize.authenticate();
         console.log('Database connection has been established successfully.');
         
-        // This will create/update tables according to model definitions.
-        // { alter: true } tries to alter existing tables to match the models.
-        await sequelize.sync({ alter: true });
-        console.log('All models were synchronized successfully.');
+        // 3. Attempt Sync
+        // Note: { alter: true } can sometimes fail in production if table structures conflict.
+        // We wrap this in a nested try-catch so the server process DOES NOT EXIT if sync fails.
+        try {
+            await sequelize.sync({ alter: true });
+            console.log('All models were synchronized successfully.');
+            
+            // 4. Seed Data
+            await seedDatabase();
+        } catch (syncError) {
+            console.error('---------------------------------------------------');
+            console.error('CRITICAL DATABASE ERROR (SYNC/SEED):');
+            console.error(syncError);
+            console.error('---------------------------------------------------');
+            console.error('The server is still running, but database features may fail.');
+        }
 
-        // Seed the database with initial data if it's empty
-        await seedDatabase();
-
-        app.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-        });
     } catch (error) {
-        console.error('Unable to start the server:', error);
+        console.error('---------------------------------------------------');
+        console.error('FATAL: Unable to connect to the database:');
+        console.error(error);
+        console.error('---------------------------------------------------');
     }
 };
 

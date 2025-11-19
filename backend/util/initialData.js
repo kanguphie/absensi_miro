@@ -8,6 +8,7 @@ const initialAdmin = {
 const initialSettings = {
     schoolName: 'MI Islamiyah Rowosari',
     schoolLogoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Kementerian_Agama_new_logo.png/535px-Kementerian_Agama_new_logo.png',
+    runningText: 'Selamat Datang di Sistem Absensi Digital MI Islamiyah Rowosari. Budayakan 5S (Senyum, Salam, Sapa, Sopan, Santun).',
     operatingHours: [
         { dayGroup: 'mon-thu', checkInTime: '07:00', lateTolerance: 15, scanInBefore: 60, checkOutTime: '13:00', scanOutBefore: 15, scanOutEndTime: '15:00', enabled: true },
         { dayGroup: 'fri', checkInTime: '07:00', lateTolerance: 15, scanInBefore: 60, checkOutTime: '11:00', scanOutBefore: 15, scanOutEndTime: '13:00', enabled: true },
