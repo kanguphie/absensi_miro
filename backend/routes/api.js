@@ -1,5 +1,6 @@
 
 
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -18,11 +19,6 @@ const timeToMinutes = (time) => {
     return hours * 60 + minutes;
 };
 
-// FIX: This function was incorrectly creating a Date object based on a localized string,
-// causing the server (likely running in UTC) to store a timestamp that was 7 hours ahead.
-// The new implementation correctly uses the current universal timestamp for storage (`new Date()`)
-// while using Intl.DateTimeFormat to get accurate date/time parts for the 'Asia/Jakarta'
-// timezone, which are needed for logic checks (e.g., operating hours, holidays).
 const getNowInWIB = () => {
     const now = new Date(); // This is the correct universal timestamp for storage.
 
@@ -93,6 +89,22 @@ router.post('/auth/login', async (req, res) => {
         }
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
         res.json({ success: true, user: { id: user.id, username: user.username, role: user.role }, token });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// --- PIN Verification (Public) ---
+router.post('/auth/verify-pin', async (req, res) => {
+    try {
+        const { pin } = req.body;
+        const [setting] = await Setting.findOrCreate({ where: { id: 1 } });
+        
+        if (setting.manualPin === pin) {
+            res.json({ success: true });
+        } else {
+            res.status(401).json({ success: false, message: 'PIN Salah' });
+        }
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -227,6 +239,25 @@ router.get('/classes', async (req, res) => res.json(await SchoolClass.findAll({ 
 
 // --- Protected Routes ---
 router.use(authMiddleware);
+
+// Auth
+router.put('/auth/change-password', async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const userId = req.user.id;
+        
+        const user = await User.findByPk(userId);
+        if (!user || !bcrypt.compareSync(currentPassword, user.password)) {
+            return res.status(400).json({ success: false, message: 'Password lama salah' });
+        }
+
+        const hashedNewPassword = bcrypt.hashSync(newPassword, 10);
+        await user.update({ password: hashedNewPassword });
+        res.json({ success: true, message: 'Password berhasil diubah' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Gagal mengubah password' });
+    }
+});
 
 // Students
 router.get('/students', async (req, res) => res.json(await Student.findAll({ include: SchoolClass, order: [['name', 'ASC']] })));

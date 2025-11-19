@@ -55,6 +55,7 @@ export interface SchoolSettings {
   schoolLogoUrl: string;
   operatingHours: OperatingHours[];
   holidays: string[];
+  manualPin?: string; // PIN for protecting manual attendance page
 }
 
 export interface User {

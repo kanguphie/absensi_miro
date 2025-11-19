@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { Student } from '../../types';
@@ -26,7 +27,7 @@ const StudentModal: React.FC<{
         nis: student.nis,
         name: student.name,
         classId: student.classId,
-        rfidUid: student.rfidUid,
+        rfidUid: student.rfidUid || '',
       });
     } else {
       if (classes.length > 0) {
@@ -436,6 +437,36 @@ const StudentsPage: React.FC = () => {
     });
   };
 
+  const handleExport = () => {
+      if (sortedStudents.length === 0) {
+          Swal.fire('Info', 'Tidak ada data siswa untuk diekspor.', 'info');
+          return;
+      }
+
+      const dataToExport = sortedStudents.map(student => ({
+          'NIS': student.nis,
+          'Nama Lengkap': student.name,
+          'Kelas': getClassName(student.classId),
+          'RFID UID': student.rfidUid || ''
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      
+      // Set column widths
+      worksheet['!cols'] = [
+          { wch: 15 }, // NIS
+          { wch: 30 }, // Nama
+          { wch: 15 }, // Kelas
+          { wch: 20 }  // RFID
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Data Siswa");
+      
+      const timestamp = new Date().toISOString().slice(0,10);
+      XLSX.writeFile(workbook, `data_siswa_${timestamp}.xlsx`);
+  };
+
   const isAllSelected = selectedIds.size > 0 && selectedIds.size === sortedStudents.length;
 
   const SortableHeader: React.FC<{ columnKey: SortableKeys, title: string }> = ({ columnKey, title }) => {
@@ -461,11 +492,14 @@ const StudentsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold text-slate-800">Manajemen Siswa</h1>
         <div className="flex space-x-2">
+            <button onClick={handleExport} className="bg-teal-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-teal-700 flex items-center transition-colors">
+              <FiDownload className="mr-2" /> Export
+            </button>
             <button onClick={() => setIsImportModalOpen(true)} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center transition-colors">
               <FiUpload className="mr-2" /> Import
             </button>
             <button onClick={() => handleOpenStudentModal(null)} className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center transition-colors">
-              <FiPlus className="mr-2" /> Tambah Siswa
+              <FiPlus className="mr-2" /> Tambah
             </button>
         </div>
       </div>
@@ -532,7 +566,6 @@ const StudentsPage: React.FC = () => {
                       className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
                       checked={isAllSelected}
                       ref={el => {
-                        // FIX: The ref callback must not return a value. Wrapped in a block to ensure void return.
                         if (el) {
                           el.indeterminate = selectedIds.size > 0 && !isAllSelected;
                         }

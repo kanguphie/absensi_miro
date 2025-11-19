@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiArrowLeft, FiSearch, FiLoader } from 'react-icons/fi';
+import { FiArrowLeft, FiSearch, FiLoader, FiLock } from 'react-icons/fi';
 import { useData } from '../contexts/DataContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { Student, SchoolClass } from '../types';
@@ -9,6 +10,10 @@ import { api } from '../services/api';
 declare const Swal: any;
 
 const ManualAttendancePage: React.FC = () => {
+  const [isLocked, setIsLocked] = useState(true);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Student[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -20,8 +25,14 @@ const ManualAttendancePage: React.FC = () => {
   const { recordAttendanceByNis } = useData();
   const { settings } = useSettings();
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const pinInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Focus PIN input on mount
+    if (isLocked) {
+        pinInputRef.current?.focus();
+    }
+    
     const fetchPublicData = async () => {
       try {
         const [studentsData, classesData] = await Promise.all([
@@ -32,13 +43,29 @@ const ManualAttendancePage: React.FC = () => {
         setLocalClasses(classesData);
       } catch (error) {
         console.error("Failed to fetch public data for manual attendance:", error);
-        Swal.fire('Error', 'Gagal memuat data. Mohon muat ulang halaman.', 'error');
       } finally {
         setIsLoadingData(false);
       }
     };
     fetchPublicData();
-  }, []);
+  }, [isLocked]);
+
+  const handleUnlock = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!pin) return;
+      
+      try {
+          const result = await api.verifyPin(pin);
+          if (result.success) {
+              setIsLocked(false);
+          } else {
+              setPinError('PIN salah');
+              setPin('');
+          }
+      } catch (error) {
+          setPinError('Terjadi kesalahan server');
+      }
+  };
 
   const playNotificationSound = (context: AudioContext, success: boolean) => {
     const oscillator = context.createOscillator();
@@ -142,6 +169,40 @@ const ManualAttendancePage: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  if (isLocked) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+             <div className="w-full max-w-md bg-white rounded-xl shadow-xl p-8 text-center">
+                 <div className="bg-indigo-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                     <FiLock className="text-indigo-600 text-2xl" />
+                 </div>
+                 <h2 className="text-2xl font-bold text-slate-800 mb-2">Halaman Terkunci</h2>
+                 <p className="text-slate-500 mb-6">Masukkan PIN Petugas untuk mengakses absensi manual.</p>
+                 
+                 <form onSubmit={handleUnlock}>
+                     <input
+                        ref={pinInputRef}
+                        type="password" 
+                        value={pin}
+                        onChange={(e) => { setPin(e.target.value); setPinError(''); }}
+                        className="w-full text-center text-2xl tracking-widest py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 font-mono"
+                        placeholder="PIN"
+                        maxLength={6}
+                        autoFocus
+                     />
+                     {pinError && <p className="text-red-500 text-sm mb-4">{pinError}</p>}
+                     <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition-colors">
+                         Buka Kunci
+                     </button>
+                 </form>
+                 <div className="mt-6">
+                    <Link to="/" className="text-slate-500 hover:text-indigo-600 text-sm">Kembali ke Beranda</Link>
+                 </div>
+             </div>
+        </div>
+      );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">

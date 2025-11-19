@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { SchoolSettings, OperatingHours } from '../../types';
-import { FiSave, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiSave, FiPlus, FiTrash2, FiLock, FiKey } from 'react-icons/fi';
+import { api } from '../../services/api';
 
 declare const Swal: any;
 
@@ -9,6 +11,10 @@ const SettingsPage: React.FC = () => {
   const { settings, loading, updateSettings } = useSettings();
   const [formState, setFormState] = useState<SchoolSettings | null>(null);
   const [newHoliday, setNewHoliday] = useState('');
+  
+  // Password change state
+  const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -73,17 +79,39 @@ const SettingsPage: React.FC = () => {
     }
   };
   
+  const handleChangePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (passwords.new !== passwords.confirm) {
+          Swal.fire('Error', 'Konfirmasi password baru tidak sesuai.', 'error');
+          return;
+      }
+      
+      try {
+          const result = await api.changePassword(passwords.current, passwords.new);
+          if (result.success) {
+              Swal.fire('Sukses', 'Password berhasil diubah.', 'success');
+              setPasswords({ current: '', new: '', confirm: '' });
+              setIsChangingPassword(false);
+          } else {
+              Swal.fire('Gagal', result.message, 'error');
+          }
+      } catch (error) {
+          Swal.fire('Error', 'Terjadi kesalahan saat mengubah password.', 'error');
+      }
+  };
+  
   if (loading || !formState) {
       return <div>Memuat pengaturan...</div>
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in pb-10">
       <h1 className="text-3xl font-bold text-slate-800 mb-6">Pengaturan Sistem</h1>
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
+                {/* School Profile */}
                 <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                     <h2 className="text-xl font-bold text-slate-800 mb-4">Profil Sekolah</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -102,6 +130,43 @@ const SettingsPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Security Section */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                    <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center"><FiLock className="mr-2"/> Keamanan</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                         <div>
+                            <label htmlFor="manualPin" className="block text-sm font-medium text-slate-700 mb-1">PIN Absensi Manual</label>
+                            <div className="flex">
+                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-sm">
+                                    <FiKey />
+                                </span>
+                                <input type="text" name="manualPin" id="manualPin" value={formState.manualPin || ''} onChange={handleInputChange}
+                                    className="w-full py-2 px-3 border border-slate-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+                                    placeholder="Contoh: 123456"
+                                    maxLength={6}
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">PIN ini digunakan untuk mengakses halaman Absensi Manual (Kiosk).</p>
+                        </div>
+                        <div>
+                             <label className="block text-sm font-medium text-slate-700 mb-1">Password Admin</label>
+                             <button type="button" onClick={() => setIsChangingPassword(!isChangingPassword)} className="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center">
+                                 {isChangingPassword ? 'Batal Ubah Password' : 'Ubah Password Admin'}
+                             </button>
+                             
+                             {isChangingPassword && (
+                                 <div className="mt-3 space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                     <input type="password" placeholder="Password Lama" className="w-full p-2 border rounded text-sm" value={passwords.current} onChange={e => setPasswords({...passwords, current: e.target.value})} />
+                                     <input type="password" placeholder="Password Baru" className="w-full p-2 border rounded text-sm" value={passwords.new} onChange={e => setPasswords({...passwords, new: e.target.value})} />
+                                     <input type="password" placeholder="Konfirmasi Password Baru" className="w-full p-2 border rounded text-sm" value={passwords.confirm} onChange={e => setPasswords({...passwords, confirm: e.target.value})} />
+                                     <button onClick={handleChangePassword} className="w-full bg-slate-800 text-white py-2 rounded text-sm font-medium hover:bg-slate-900">Simpan Password Baru</button>
+                                 </div>
+                             )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Operating Hours */}
                 <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                 <h2 className="text-xl font-bold text-slate-800 mb-4">Jam Operasional</h2>
                     {formState.operatingHours.map(op => (
@@ -148,8 +213,9 @@ const SettingsPage: React.FC = () => {
                 </div>
             </div>
             
+            {/* Holiday Settings */}
             <div className="lg:col-span-1">
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 sticky top-6">
                     <h2 className="text-xl font-bold text-slate-800 mb-4">Pengaturan Hari Libur</h2>
                     <div className="flex gap-2 mb-4">
                         <input type="date" value={newHoliday} onChange={e => setNewHoliday(e.target.value)} className="w-full py-2 px-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />

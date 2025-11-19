@@ -1,3 +1,4 @@
+
 const initialAdmin = {
     username: 'admin',
     password: 'admin123',
@@ -13,6 +14,7 @@ const initialSettings = {
         { dayGroup: 'sat', checkInTime: '08:00', lateTolerance: 15, scanInBefore: 45, checkOutTime: '12:00', scanOutBefore: 15, scanOutEndTime: '14:00', enabled: false },
     ],
     holidays: ['2024-12-25'],
+    manualPin: '123456'
 };
 
 const initialClasses = [

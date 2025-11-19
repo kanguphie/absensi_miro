@@ -1,3 +1,4 @@
+
 import { Student, SchoolClass, AttendanceLog, SchoolSettings, User, AttendanceStatus } from '../types';
 
 const API_BASE_URL = 'https://apimiro.madarussalamsubah.id/api';
@@ -212,5 +213,23 @@ export const api = {
         body: JSON.stringify({ username, password }),
     });
     return response.json(); // Don't use handleResponse as 401 is a valid failed login
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    return response.json();
+  },
+  
+  verifyPin: async (pin: string): Promise<{ success: boolean }> => {
+    const response = await fetch(`${API_BASE_URL}/auth/verify-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+    });
+    return response.json();
   }
 };
