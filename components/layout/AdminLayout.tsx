@@ -99,16 +99,18 @@ const AdminLayout: React.FC = () => {
 
       {/* Sidebar */}
       <aside 
-        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:transform-none flex flex-col ${
+        className={`fixed lg:static inset-y-0 left-0 z-30 w-64 bg-gradient-to-b from-slate-900 to-slate-800 border-r border-slate-700 text-slate-300 transform transition-transform duration-300 ease-in-out lg:transform-none flex flex-col ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="h-16 flex items-center px-6 border-b border-slate-100">
+        <div className="h-16 flex items-center px-6 border-b border-slate-700/50">
             <div className="flex items-center gap-3">
-                <img src={settings?.schoolLogoUrl} alt="Logo" className="h-8 w-8 object-contain" />
-                <span className="font-bold text-xl text-slate-800 tracking-tight">Admin Panel</span>
+                <div className="bg-white p-1 rounded-full">
+                  <img src={settings?.schoolLogoUrl} alt="Logo" className="h-6 w-6 object-contain" />
+                </div>
+                <span className="font-bold text-xl text-white tracking-tight">Admin Panel</span>
             </div>
-            <button className="ml-auto lg:hidden text-slate-500" onClick={() => setSidebarOpen(false)}>
+            <button className="ml-auto lg:hidden text-slate-400 hover:text-white" onClick={() => setSidebarOpen(false)}>
                 <FiX size={24} />
             </button>
         </div>
@@ -122,18 +124,18 @@ const AdminLayout: React.FC = () => {
                     onClick={() => toggleMenu(item.name)}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
                       openMenus.includes(item.name) 
-                        ? 'bg-indigo-50 text-indigo-700' 
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        ? 'bg-white/10 text-white' 
+                        : 'text-slate-400 hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center">
-                      <item.icon className={`w-5 h-5 mr-3 ${openMenus.includes(item.name) ? 'text-indigo-600' : 'text-slate-400'}`} />
+                      <item.icon className={`w-5 h-5 mr-3 ${openMenus.includes(item.name) ? 'text-indigo-400' : 'text-slate-500'}`} />
                       {item.name}
                     </div>
                     {openMenus.includes(item.name) ? <FiChevronUp /> : <FiChevronDown />}
                   </button>
                   {openMenus.includes(item.name) && (
-                    <div className="mt-1 ml-4 space-y-1 border-l-2 border-slate-100 pl-2">
+                    <div className="mt-1 ml-4 space-y-1 border-l-2 border-slate-700 pl-2">
                       {item.subItems.map((subItem) => (
                         <Link
                           key={subItem.path}
@@ -141,11 +143,11 @@ const AdminLayout: React.FC = () => {
                           onClick={() => setSidebarOpen(false)}
                           className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                             isActive(subItem.path)
-                              ? 'bg-indigo-100 text-indigo-700 shadow-sm'
-                              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
+                              : 'text-slate-400 hover:text-white hover:bg-white/5'
                           }`}
                         >
-                          <subItem.icon className={`w-4 h-4 mr-3 ${isActive(subItem.path) ? 'text-indigo-600' : 'text-slate-400'}`} />
+                          <subItem.icon className={`w-4 h-4 mr-3 ${isActive(subItem.path) ? 'text-indigo-200' : 'text-slate-500'}`} />
                           {subItem.name}
                         </Link>
                       ))}
@@ -158,11 +160,11 @@ const AdminLayout: React.FC = () => {
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive(item.path)
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-900/50'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
                   }`}
                 >
-                  <item.icon className={`w-5 h-5 mr-3 ${isActive(item.path) ? 'text-indigo-200' : 'text-slate-400'}`} />
+                  <item.icon className={`w-5 h-5 mr-3 ${isActive(item.path) ? 'text-indigo-200' : 'text-slate-500'}`} />
                   {item.name}
                 </Link>
               )}
@@ -170,21 +172,21 @@ const AdminLayout: React.FC = () => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-100">
-            <div className="bg-slate-50 rounded-xl p-4 mb-4">
+        <div className="p-4 border-t border-slate-700/50">
+            <div className="bg-white/5 rounded-xl p-4 mb-4 border border-white/10">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                    <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-inner">
                         {user?.username.charAt(0).toUpperCase()}
                     </div>
                     <div className="overflow-hidden">
-                        <p className="font-bold text-sm text-slate-800 truncate">{user?.username}</p>
-                        <p className="text-xs text-slate-500 truncate">{user?.role}</p>
+                        <p className="font-bold text-sm text-white truncate">{user?.username}</p>
+                        <p className="text-xs text-slate-400 truncate">{user?.role}</p>
                     </div>
                 </div>
             </div>
             <button
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                className="w-full flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium text-red-300 bg-red-500/10 hover:bg-red-600 hover:text-white transition-colors"
             >
                 <FiLogOut className="w-4 h-4 mr-2" />
                 Keluar
