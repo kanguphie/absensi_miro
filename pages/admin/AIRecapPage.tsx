@@ -27,8 +27,9 @@ const AIRecapPage: React.FC = () => {
     const { students, classes, attendanceLogs } = useData();
     const { settings } = useSettings();
     
-    // Check for API Key availability
-    const apiKey = process.env.API_KEY;
+    // VITE SPECIFIC: Access environment variable using import.meta.env with VITE_ prefix
+    // We also keep process.env as a fallback just in case a custom define plugin is used
+    const apiKey = (import.meta as any).env?.VITE_API_KEY || (typeof process !== 'undefined' ? process.env.API_KEY : undefined);
     const hasApiKey = !!apiKey && apiKey.length > 0;
 
     const [messages, setMessages] = useState<ChatMessage[]>([
@@ -54,7 +55,7 @@ const AIRecapPage: React.FC = () => {
                     {
                         id: 'missing-key',
                         role: 'model',
-                        text: '⚠️ **API Key Belum Dikonfigurasi.**\nFitur AI tidak dapat digunakan. Silakan masukkan API Key Google Gemini Anda di pengaturan Environment Variables (Vercel) dengan nama key `API_KEY`.',
+                        text: '⚠️ **API Key Belum Dikonfigurasi.**\n\nAgar fitur ini berfungsi di Vercel/Vite:\n1. Masuk ke Settings > Environment Variables di Vercel.\n2. Tambahkan key baru bernama **`VITE_API_KEY`**.\n3. Isi dengan API Key Google Gemini Anda.\n4. Redeploy aplikasi.',
                         timestamp: new Date(),
                         isError: true
                     }
@@ -126,7 +127,7 @@ const AIRecapPage: React.FC = () => {
         if (!input.trim()) return;
         
         // Prevent sending if no API Key
-        if (!hasApiKey) return;
+        if (!hasApiKey || !apiKey) return;
 
         const userMessage: ChatMessage = {
             id: Date.now().toString(),
@@ -141,7 +142,7 @@ const AIRecapPage: React.FC = () => {
 
         try {
             const systemPrompt = buildSystemPrompt();
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: apiKey });
             
             // Construct history: Remove welcome message and any error messages
             const history = messages
@@ -175,7 +176,7 @@ const AIRecapPage: React.FC = () => {
             let errorText = "Maaf, terjadi kesalahan saat menghubungi layanan AI.";
             
             if (error.message?.includes('API key')) {
-                errorText = "⚠️ **API Key tidak valid.** Mohon periksa kembali API Key Anda.";
+                errorText = "⚠️ **API Key tidak valid.** Mohon periksa kembali API Key Anda di Environment Variables.";
             } else if (error.message?.includes('quota')) {
                 errorText = "⚠️ **Kuota API habis.** Mohon coba lagi nanti.";
             }
@@ -297,7 +298,7 @@ const AIRecapPage: React.FC = () => {
                      { !hasApiKey && (
                         <p className="text-red-500 text-sm mt-2 flex items-center font-medium animate-fade-in">
                             <FiAlertTriangle className="mr-2" size={16} />
-                            API Key belum terdeteksi. Fitur ini tidak berfungsi.
+                            API Key belum terdeteksi. Silakan tambahkan <code>VITE_API_KEY</code> di Vercel.
                         </p>
                     )}
                 </div>
