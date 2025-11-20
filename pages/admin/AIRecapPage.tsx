@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { useData } from '../../contexts/DataContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { AttendanceStatus } from '../../types';
-import { FiSend, FiCpu, FiUser, FiTrash2, FiDatabase, FiAlertTriangle, FiInfo } from 'react-icons/fi';
+import { FiSend, FiCpu, FiUser, FiTrash2, FiAlertTriangle } from 'react-icons/fi';
 
 interface ChatMessage {
     id: string;
@@ -26,6 +26,11 @@ const statusMap: { [key in AttendanceStatus]: string } = {
 const AIRecapPage: React.FC = () => {
     const { students, classes, attendanceLogs } = useData();
     const { settings } = useSettings();
+    
+    // Check for API Key availability
+    const apiKey = process.env.API_KEY;
+    const hasApiKey = !!apiKey && apiKey.length > 0;
+
     const [messages, setMessages] = useState<ChatMessage[]>([
         {
             id: 'welcome',
@@ -37,6 +42,26 @@ const AIRecapPage: React.FC = () => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Effect to show warning if no API key is found
+    useEffect(() => {
+        if (!hasApiKey) {
+            setMessages(prev => {
+                // Prevent duplicate error messages
+                if (prev.some(m => m.id === 'missing-key')) return prev;
+                return [
+                    ...prev,
+                    {
+                        id: 'missing-key',
+                        role: 'model',
+                        text: '⚠️ **API Key Belum Dikonfigurasi.**\nFitur AI tidak dapat digunakan. Silakan masukkan API Key Google Gemini Anda di pengaturan Environment Variables (Vercel) dengan nama key `API_KEY`.',
+                        timestamp: new Date(),
+                        isError: true
+                    }
+                ];
+            });
+        }
+    }, [hasApiKey]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -64,55 +89,44 @@ const AIRecapPage: React.FC = () => {
             });
             
             const className = classes.find(c => c.id === s.classId)?.name || 'Unknown';
-            return `ID:${s.nis}, Name:${s.name}, Class:${className}, Stats(Mth):${JSON.stringify(stats)}`;
+            return `ID:${s.nis}, Nama:${s.name}, Kelas:${className}, Stats(Bulan Ini):${JSON.stringify(stats)}`;
         }).join('\n');
 
         // 2. Context Info
         const contextInfo = `
-        Current Date: ${today.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        School Name: ${settings?.schoolName}
-        Total Students: ${students.length}
-        Classes: ${classes.map(c => c.name).join(', ')}
-        Attendance Codes: H=Hadir(Present), T=Terlambat(Late), S=Sakit(Sick), I=Izin(Permit), A=Alfa(Absent), PC=Pulang Cepat(Early Leave)
+        Tanggal Hari Ini: ${today.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        Nama Sekolah: ${settings?.schoolName}
+        Total Siswa: ${students.length}
+        Daftar Kelas: ${classes.map(c => c.name).join(', ')}
+        Kode Absensi: H=Hadir, T=Terlambat, S=Sakit, I=Izin, A=Alfa, PC=Pulang Cepat
         `;
 
         return `
-        You are an AI Data Assistant for a school attendance system.
-        Your goal is to answer questions based strictly on the provided data.
+        Anda adalah Asisten Data AI untuk sistem absensi sekolah.
+        Tujuan Anda adalah menjawab pertanyaan berdasarkan data yang disediakan secara ketat.
         
-        === SCHOOL CONTEXT ===
+        === KONTEKS SEKOLAH ===
         ${contextInfo}
         
-        === STUDENT DATA (CURRENT MONTH STATS) ===
+        === DATA SISWA (STATISTIK BULAN INI) ===
         ${studentSummary}
         
-        === INSTRUCTIONS ===
-        1. Answer in Bahasa Indonesia.
-        2. Be professional, concise, and helpful.
-        3. You can perform analysis like ranking (who is most late), counting (how many sick today), or summarizing class performance.
-        4. If asked about data not present (e.g., grades, phone numbers), politely say you only have access to attendance data.
-        5. Format your response nicely (use Markdown for lists, bold text, tables if necessary).
-        6. When summarizing, mention the specific numbers.
+        === INSTRUKSI ===
+        1. Jawablah dalam Bahasa Indonesia yang sopan dan profesional.
+        2. Lakukan analisis data seperti perengkingan (siapa paling sering terlambat), penghitungan (berapa yang sakit hari ini), atau ringkasan kinerja kelas jika diminta.
+        3. Jika ditanya tentang data yang tidak ada (misal: nilai, nomor HP), katakan dengan sopan bahwa Anda hanya memiliki akses ke data absensi.
+        4. Format jawaban Anda dengan rapi (gunakan Markdown untuk daftar, teks tebal, atau tabel jika perlu).
+        5. Saat meringkas, sebutkan angka spesifik dari data yang tersedia.
+        6. Jangan mengarang data.
         `;
     };
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim()) return;
-
-        // Graceful handling if API Key is not set in environment
-        if (!process.env.API_KEY) {
-             const errorMsg: ChatMessage = {
-                id: Date.now().toString(),
-                role: 'model',
-                text: "⚠️ **API Key belum dikonfigurasi.**\n\nMohon tambahkan `API_KEY` ke dalam file `.env` di root project Anda, lalu restart server.\n\nContoh: `API_KEY=AIzaSy...`",
-                timestamp: new Date(),
-                isError: true
-            };
-            setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: input, timestamp: new Date() }, errorMsg]);
-            setInput('');
-            return;
-        }
+        
+        // Prevent sending if no API Key
+        if (!hasApiKey) return;
 
         const userMessage: ChatMessage = {
             id: Date.now().toString(),
@@ -161,7 +175,7 @@ const AIRecapPage: React.FC = () => {
             let errorText = "Maaf, terjadi kesalahan saat menghubungi layanan AI.";
             
             if (error.message?.includes('API key')) {
-                errorText = "⚠️ **API Key tidak valid.** Mohon periksa kembali API Key Anda di file `.env`.";
+                errorText = "⚠️ **API Key tidak valid.** Mohon periksa kembali API Key Anda.";
             } else if (error.message?.includes('quota')) {
                 errorText = "⚠️ **Kuota API habis.** Mohon coba lagi nanti.";
             }
@@ -268,22 +282,22 @@ const AIRecapPage: React.FC = () => {
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 placeholder="Tanya tentang data absensi... (Contoh: 'Siapa yang paling sering terlambat?')"
-                                className={`w-full border ${!process.env.API_KEY ? 'border-red-300 bg-red-50 focus:ring-red-200' : 'border-slate-300 focus:ring-indigo-500'} rounded-xl px-4 py-3 pr-14 focus:outline-none focus:ring-2 transition-all shadow-sm text-slate-800 placeholder-slate-400`}
+                                className="w-full border border-slate-300 rounded-xl px-4 py-3 pr-14 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm placeholder-slate-400 text-slate-800 bg-white"
                                 disabled={isTyping}
                             />
                             <button 
                                 type="submit" 
-                                disabled={!input.trim() || isTyping}
-                                className="absolute right-2 top-1.5 bottom-1.5 bg-indigo-600 text-white px-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center shadow-sm aspect-square"
+                                disabled={!input.trim() || isTyping || !hasApiKey}
+                                className="absolute right-2 top-1.5 bottom-1.5 bg-indigo-600 text-white px-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center shadow-sm aspect-square"
                             >
                                 {isTyping ? <FiCpu className="animate-spin" /> : <FiSend />}
                             </button>
                         </div>
                     </form>
-                    { !process.env.API_KEY && (
-                        <p className="text-red-500 text-xs mt-2 flex items-center font-medium">
-                            <FiAlertTriangle className="mr-1.5" size={14} />
-                            API Key belum terdeteksi. Fitur ini mungkin tidak berfungsi.
+                     { !hasApiKey && (
+                        <p className="text-red-500 text-sm mt-2 flex items-center font-medium animate-fade-in">
+                            <FiAlertTriangle className="mr-2" size={16} />
+                            API Key belum terdeteksi. Fitur ini tidak berfungsi.
                         </p>
                     )}
                 </div>
