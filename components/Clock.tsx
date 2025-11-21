@@ -10,6 +10,7 @@ const Clock: React.FC = () => {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
+    timeZone: 'Asia/Jakarta' // Force WIB
   });
   
   const dateString = now.toLocaleDateString('id-ID', {
@@ -17,6 +18,7 @@ const Clock: React.FC = () => {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    timeZone: 'Asia/Jakarta' // Force WIB
   });
 
   return (

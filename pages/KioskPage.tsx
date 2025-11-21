@@ -233,7 +233,8 @@ const KioskPage: React.FC = () => {
                   <p className="text-xs text-slate-500 truncate">{log.className}</p>
                 </div>
                 <div className="text-right pl-2">
-                  <p className="text-xs font-bold text-slate-600 font-mono">{new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+                  {/* FORCE WIB TIMEZONE HERE */}
+                  <p className="text-xs font-bold text-slate-600 font-mono">{new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}</p>
                   <span className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-full mt-1 inline-block ${log.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                     {log.type === 'in' ? 'Masuk' : 'Pulang'}
                   </span>

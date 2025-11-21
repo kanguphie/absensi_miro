@@ -49,20 +49,20 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const getAttendancePeriod = useCallback((date: Date): string => {
       if (!settings) return "MEMUAT...";
       
-      const todayStr = (d => `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`)(date);
+      // Force Date Format to Asia/Jakarta
+      // 1. Get YYYY-MM-DD in Jakarta
+      const jakartaDateStr = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
       
-      // 1. Check for Holiday
-      if (settings.holidays.includes(todayStr)) return 'HARI LIBUR';
+      // 2. Check for Holiday
+      if (settings.holidays.includes(jakartaDateStr)) return 'HARI LIBUR';
 
-      // 2. Check for Early Dismissal (Override) for TODAY
-      // Since this context function is used for the GENERAL Kiosk Banner, 
-      // we check if there's a dismissal that applies to "All Classes" (empty classIds) OR just check the first one.
-      // Visual simplification: If *any* early dismissal is active today for the majority, we show "SCAN PULANG" early.
-      const earlyDismissal = settings.earlyDismissals?.find(ed => ed.date === todayStr);
+      // 3. Check for Early Dismissal (Override) for TODAY in Jakarta
+      const earlyDismissal = settings.earlyDismissals?.find(ed => ed.date === jakartaDateStr);
       
-      // 3. Determine Base Operating Hours
-      const day = date.getDay();
-      const dayGroup = (day >= 1 && day <= 4) ? 'mon-thu' : (day === 5) ? 'fri' : (day === 6) ? 'sat' : null;
+      // 4. Determine Day of Week in Jakarta
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'Asia/Jakarta' });
+      const dayMap: {[key: string]: string} = { 'Mon': 'mon-thu', 'Tue': 'mon-thu', 'Wed': 'mon-thu', 'Thu': 'mon-thu', 'Fri': 'fri', 'Sat': 'sat' };
+      const dayGroup = dayMap[dayName] as 'mon-thu' | 'fri' | 'sat' | undefined;
       
       if (!dayGroup) return 'WAKTU ABSENSI DITUTUP';
 
@@ -74,11 +74,17 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       // Apply Override if exists
       if (earlyDismissal) {
-          // We assume the kiosk banner should reflect the early dismissal time
           effectiveOpHours.checkOutTime = earlyDismissal.time;
       }
 
-      const currentTime = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+      // 5. Get Current Time HH:MM in Jakarta
+      const currentTime = date.toLocaleTimeString('en-GB', { 
+          hour: '2-digit', 
+          minute: '2-digit', 
+          hour12: false, 
+          timeZone: 'Asia/Jakarta' 
+      });
+
       const currentMinutes = timeToMinutes(currentTime);
       const checkInTimeMinutes = timeToMinutes(effectiveOpHours.checkInTime);
       const scanInStartMinutes = checkInTimeMinutes - effectiveOpHours.scanInBefore;
