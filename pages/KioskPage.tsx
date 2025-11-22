@@ -18,30 +18,48 @@ interface ScanResult {
   timestamp?: Date;
 }
 
-const playNotificationSound = (context: AudioContext, success: boolean) => {
-  const oscillator = context.createOscillator();
-  const gainNode = context.createGain();
-  oscillator.connect(gainNode);
-  gainNode.connect(context.destination);
-  
-  gainNode.gain.setValueAtTime(0, context.currentTime);
-  gainNode.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.01);
+const playNotificationSound = (success: boolean, message: string = '') => {
+  if ('speechSynthesis' in window) {
+    let text = "";
 
-  if (success) {
-    oscillator.type = 'sine';
-    // Happy major chord arpeggio fast
-    oscillator.frequency.setValueAtTime(523.25, context.currentTime); // C5
-    oscillator.frequency.linearRampToValueAtTime(659.25, context.currentTime + 0.1); // E5
-  } else {
-    oscillator.type = 'sawtooth';
-    // Error buzz
-    oscillator.frequency.setValueAtTime(110, context.currentTime); // A2
-    oscillator.frequency.linearRampToValueAtTime(55, context.currentTime + 0.3); // A1
+    if (success) {
+      // Skenario 1: Berhasil
+      text = "Terimakasih";
+    } else {
+      // Cek apakah pesan error mengindikasikan duplikasi scan
+      // Backend biasanya mengirim: "Anda sudah absen masuk hari ini" atau "Anda sudah absen pulang hari ini"
+      if (message.toLowerCase().includes('sudah absen') || message.toLowerCase().includes('already')) {
+         // Skenario 3: Sudah Scan
+         text = "Kamu telah melakukan Scan";
+      } else {
+         // Skenario 2: Gagal / Error Umum (Kartu tidak dikenal, dll)
+         text = "Silakan Coba lagi!";
+      }
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Ambil daftar suara yang tersedia di browser/OS
+    const voices = window.speechSynthesis.getVoices();
+    
+    // Cari suara Bahasa Indonesia terbaik untuk kesan "Tegas & Lantang"
+    const preferredVoice = voices.find(v => v.name.includes('Google Bahasa Indonesia')) 
+                        || voices.find(v => v.name.includes('Microsoft Andika'))
+                        || voices.find(v => v.lang.includes('id'));
+
+    if (preferredVoice) {
+        utterance.voice = preferredVoice;
+    }
+
+    utterance.lang = 'id-ID';
+    utterance.volume = 1.0; // Maksimal (Lantang)
+    utterance.rate = 1.0;   // Kecepatan normal (Agar artikulasi jelas dan tegas)
+    utterance.pitch = 1.0;  // Nada normal/datar (Tidak cempreng, memberikan kesan formal)
+    
+    // Hentikan suara sebelumnya jika ada
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
   }
-  
-  oscillator.start(context.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + 0.6);
-  oscillator.stop(context.currentTime + 0.6);
 };
 
 const KioskPage: React.FC = () => {
@@ -74,8 +92,6 @@ const KioskPage: React.FC = () => {
 
     // Clear any existing timer to remove previous modal
     if (timerRef.current) clearTimeout(timerRef.current);
-
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     
     try {
       // Simulate minimal delay for UI feedback if API is too fast to show the ripple
@@ -96,13 +112,13 @@ const KioskPage: React.FC = () => {
             message: result.message,
             timestamp: new Date()
         });
-        playNotificationSound(audioContext, true);
+        playNotificationSound(true, result.message);
       } else {
         setScanResult({
             type: 'error',
             message: result.message
         });
-        playNotificationSound(audioContext, false);
+        playNotificationSound(false, result.message);
       }
     } catch (error) {
        const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan tidak diketahui.';
@@ -110,7 +126,7 @@ const KioskPage: React.FC = () => {
            type: 'error',
            message: errorMessage
        });
-       playNotificationSound(audioContext, false);
+       playNotificationSound(false, errorMessage);
     } finally {
       setIsProcessing(false);
       setRfid('');

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FiArrowLeft, FiSearch, FiLoader, FiLock } from 'react-icons/fi';
@@ -67,23 +66,45 @@ const ManualAttendancePage: React.FC = () => {
       }
   };
 
-  const playNotificationSound = (context: AudioContext, success: boolean) => {
-    const oscillator = context.createOscillator();
-    const gainNode = context.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(context.destination);
-    gainNode.gain.setValueAtTime(0, context.currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.01);
-    if (success) {
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(523.25, context.currentTime);
-    } else {
-      oscillator.type = 'square';
-      oscillator.frequency.setValueAtTime(440, context.currentTime);
+  const playNotificationSound = (success: boolean, message: string = '') => {
+    if ('speechSynthesis' in window) {
+        let text = "";
+
+        if (success) {
+          // Skenario 1: Berhasil
+          text = "Terimakasih";
+        } else {
+          // Cek apakah pesan error mengindikasikan duplikasi scan
+          if (message.toLowerCase().includes('sudah absen') || message.toLowerCase().includes('already')) {
+             // Skenario 3: Sudah Scan
+             text = "Kamu telah melakukan Scan";
+          } else {
+             // Skenario 2: Gagal / Error Umum
+             text = "Silakan Coba lagi!";
+          }
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        const voices = window.speechSynthesis.getVoices();
+        
+        // Prioritaskan suara tegas/lantang
+        const preferredVoice = voices.find(v => v.name.includes('Google Bahasa Indonesia')) 
+                            || voices.find(v => v.name.includes('Microsoft Andika'))
+                            || voices.find(v => v.lang.includes('id'));
+
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+        
+        utterance.lang = 'id-ID';
+        utterance.volume = 1.0; // Maksimal (Lantang)
+        utterance.rate = 1.0;   // Normal (Tegas)
+        utterance.pitch = 1.0;  // Datar (Formal)
+        
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
     }
-    oscillator.start(context.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + 0.5);
-    oscillator.stop(context.currentTime + 0.5);
   };
 
   const handleSelectStudent = async (student: Student) => {
@@ -92,8 +113,7 @@ const ManualAttendancePage: React.FC = () => {
     setIsProcessing(true);
     setSearchQuery('');
     setSearchResults([]);
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
+    
     try {
       const result = await recordAttendanceByNis(student.nis);
       if (result.success && result.log) {
@@ -127,18 +147,18 @@ const ManualAttendancePage: React.FC = () => {
             popup: 'swal2-backdrop-blur'
           }
         });
-        playNotificationSound(audioContext, true);
+        playNotificationSound(true, result.message);
       } else {
         Swal.fire({
           icon: 'error',
           title: 'Gagal',
           text: result.message,
         });
-        playNotificationSound(audioContext, false);
+        playNotificationSound(false, result.message);
       }
     } catch (error) {
       Swal.fire('Error', 'Terjadi kesalahan koneksi.', 'error');
-      playNotificationSound(audioContext, false);
+      playNotificationSound(false, 'Terjadi kesalahan koneksi');
     } finally {
       setIsProcessing(false);
     }
