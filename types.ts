@@ -20,6 +20,7 @@ export enum AttendanceStatus {
   ABSENT = 'Alfa',
   SICK = 'Sakit',
   PERMIT = 'Izin',
+  NO_CHECKOUT = 'Tidak Scan Pulang', // New Status
 }
 
 export enum AttendancePeriod {

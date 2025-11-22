@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useData } from '../../contexts/DataContext';
+import { useSettings } from '../../contexts/SettingsContext';
 import { Student, AttendanceLog, AttendanceStatus } from '../../types';
-import { FiSearch, FiDownload, FiBarChart2, FiChevronUp, FiChevronDown, FiTrash2, FiAlertCircle } from 'react-icons/fi';
+import { FiSearch, FiDownload, FiBarChart2, FiChevronUp, FiChevronDown, FiTrash2, FiAlertCircle, FiPrinter } from 'react-icons/fi';
 import * as XLSX from 'xlsx';
 
 declare const Swal: any;
@@ -19,6 +20,7 @@ const statusColors: { [key in AttendanceStatus]: string } = {
     [AttendanceStatus.PERMIT]: 'bg-indigo-100 text-indigo-800',
     [AttendanceStatus.ABSENT]: 'bg-red-100 text-red-800',
     [AttendanceStatus.LEAVE_EARLY]: 'bg-purple-100 text-purple-800',
+    [AttendanceStatus.NO_CHECKOUT]: 'bg-orange-100 text-orange-800',
 };
 
 type EnrichedLog = AttendanceLog & { student?: Student };
@@ -26,6 +28,7 @@ type SortableKeys = 'studentName' | 'nis' | 'className' | 'timestamp';
 
 const AttendanceHistoryPage: React.FC = () => {
     const { attendanceLogs, students, classes, loading, deleteAttendanceLogsBatch } = useData();
+    const { settings } = useSettings();
     const today = toLocalISOString(new Date());
 
     const [dateRange, setDateRange] = useState({ start: today, end: today });
@@ -135,6 +138,120 @@ const AttendanceHistoryPage: React.FC = () => {
         XLSX.writeFile(workbook, `riwayat_absensi_${dateRange.start}_sd_${dateRange.end}.xlsx`);
     };
 
+    const handlePrint = () => {
+        if (sortedLogs.length === 0) {
+            Swal.fire('Info', 'Tidak ada data untuk dicetak.', 'info');
+            return;
+        }
+
+        const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        let htmlContent = `
+            <!DOCTYPE html>
+            <html lang="id">
+            <head>
+                <meta charset="UTF-8">
+                <title>Laporan Riwayat Absensi</title>
+                <style>
+                    body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; margin: 0; font-size: 10pt; color: #333; }
+                    .page-container { padding: 1.5cm; }
+                    .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+                    .header img { height: 60px; width: 60px; object-fit: contain; margin-right: 20px; }
+                    .header-text { flex-grow: 1; }
+                    .header-text h1 { margin: 0; font-size: 16pt; font-weight: 600; }
+                    .header-text h2 { margin: 0; font-size: 11pt; font-weight: 400; color: #555; }
+                    .report-info { text-align: right; font-size: 9pt; }
+                    
+                    table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 15px; }
+                    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: middle; }
+                    thead th { background-color: #f0f0f0; font-weight: 600; text-transform: uppercase; font-size: 8pt; }
+                    .text-center { text-align: center; }
+                    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 8pt; font-weight: bold; }
+                    
+                    .footer { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px; font-size: 8pt; color: #777; text-align: right; }
+                    
+                    @media print { 
+                        @page { size: A4 portrait; margin: 0; } 
+                        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="page-container">
+                    <div class="header">
+                        ${settings?.schoolLogoUrl ? `<img src="${settings.schoolLogoUrl}" alt="Logo">` : ''}
+                        <div class="header-text">
+                            <h1>Laporan Riwayat Absensi</h1>
+                            <h2>${settings?.schoolName || 'Sistem Absensi RFID'}</h2>
+                        </div>
+                        <div class="report-info">
+                            <strong>Periode:</strong><br>
+                            ${formatDate(dateRange.start)} s/d ${formatDate(dateRange.end)}
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 10px; font-size: 10pt;">
+                        <strong>Filter Aktif:</strong> 
+                        ${classFilter ? `Kelas ${classes.find(c => c.id === classFilter)?.name}` : 'Semua Kelas'} 
+                        ${statusFilter ? `| Status: ${statusFilter}` : ''}
+                        ${typeFilter ? `| Tipe: ${typeFilter === 'in' ? 'Masuk' : 'Pulang'}` : ''}
+                        | Total Data: ${sortedLogs.length}
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="text-center" style="width: 40px;">No</th>
+                                <th style="width: 120px;">Waktu</th>
+                                <th>Nama Siswa</th>
+                                <th style="width: 80px;">NIS</th>
+                                <th style="width: 60px;">Kelas</th>
+                                <th class="text-center" style="width: 80px;">Tipe</th>
+                                <th class="text-center" style="width: 100px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sortedLogs.map((log, index) => `
+                                <tr>
+                                    <td class="text-center">${index + 1}</td>
+                                    <td>
+                                        ${new Date(log.timestamp).toLocaleDateString('id-ID', {day:'2-digit', month:'short'})}
+                                        <br/>
+                                        <small>${new Date(log.timestamp).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}</small>
+                                    </td>
+                                    <td>${log.studentName}</td>
+                                    <td>${log.student?.nis || '-'}</td>
+                                    <td>${log.className}</td>
+                                    <td class="text-center">
+                                        <span style="color: ${log.type === 'in' ? '#047857' : '#4338ca'}; font-weight:bold;">
+                                            ${log.type === 'in' ? 'MASUK' : 'PULANG'}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">${log.status}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div class="footer">
+                        Dicetak pada: ${new Date().toLocaleString('id-ID')}
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.open();
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            setTimeout(() => { printWindow.print(); }, 500);
+        } else {
+            Swal.fire('Error', 'Gagal membuka tab baru. Mohon izinkan pop-up.', 'error');
+        }
+    };
+
     const handleSelectOne = (id: string) => {
         setSelectedIds(prev => {
             const newSet = new Set(prev);
@@ -219,9 +336,14 @@ const AttendanceHistoryPage: React.FC = () => {
         <div className="animate-fade-in">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                 <h1 className="text-3xl font-bold text-slate-800">Riwayat Absensi</h1>
-                <button onClick={handleExport} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center transition-colors">
-                    <FiDownload className="mr-2" /> Export ke Excel
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={handlePrint} className="bg-slate-700 text-white font-bold py-2 px-4 rounded-lg hover:bg-slate-800 flex items-center transition-colors">
+                        <FiPrinter className="mr-2" /> Cetak
+                    </button>
+                    <button onClick={handleExport} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center transition-colors">
+                        <FiDownload className="mr-2" /> Export Excel
+                    </button>
+                </div>
             </div>
             
             {selectedIds.size > 0 && (

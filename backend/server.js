@@ -5,6 +5,7 @@ const path = require('path');
 const { sequelize } = require('./models');
 const seedDatabase = require('./util/seeder');
 const apiRoutes = require('./routes/api');
+const initScheduler = require('./cron/scheduler'); // Import Scheduler
 
 const app = express();
 
@@ -50,6 +51,10 @@ const startServer = async () => {
             
             // 4. Seed Data
             await seedDatabase();
+
+            // 5. Start Scheduler (Automation)
+            initScheduler();
+            
         } catch (syncError) {
             console.error('---------------------------------------------------');
             console.error('CRITICAL DATABASE ERROR (SYNC/SEED):');

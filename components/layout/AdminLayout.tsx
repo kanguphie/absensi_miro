@@ -21,7 +21,8 @@ import {
   FiImage,
   FiUserX,
   FiClock,
-  FiCpu
+  FiCpu,
+  FiUser
 } from 'react-icons/fi';
 import Breadcrumb from './Breadcrumb';
 
@@ -37,6 +38,7 @@ import PeriodicReportsPage from '../../pages/admin/PeriodicReportsPage';
 import AttendanceHistoryPage from '../../pages/admin/AttendanceHistoryPage';
 import SettingsPage from '../../pages/admin/SettingsPage';
 import AIRecapPage from '../../pages/admin/AIRecapPage';
+import IndividualReportPage from '../../pages/admin/IndividualReportPage';
 
 const AdminLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -73,6 +75,7 @@ const AdminLayout: React.FC = () => {
       subItems: [
         { name: 'Laporan Harian', path: '/admin/daily-reports', icon: FiClipboard },
         { name: 'Laporan Bulanan', path: '/admin/reports', icon: FiCalendar },
+        { name: 'Laporan Individu', path: '/admin/individual-report', icon: FiUser },
         { name: 'Laporan Periodik', path: '/admin/periodic-reports', icon: FiActivity },
       ]
     },
@@ -231,6 +234,7 @@ const AdminLayout: React.FC = () => {
                     <Route path="reports" element={<ReportsPage />} />
                     <Route path="daily-reports" element={<DailyReportsPage />} />
                     <Route path="periodic-reports" element={<PeriodicReportsPage />} />
+                    <Route path="individual-report" element={<IndividualReportPage />} />
                     <Route path="attendance-history" element={<AttendanceHistoryPage />} />
                     <Route path="ai-recap" element={<AIRecapPage />} />
                     <Route path="settings" element={<SettingsPage />} />

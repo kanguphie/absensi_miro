@@ -21,6 +21,7 @@ const statusMap: { [key in AttendanceStatus]: string } = {
     [AttendanceStatus.PERMIT]: 'I',
     [AttendanceStatus.ABSENT]: 'A',
     [AttendanceStatus.LEAVE_EARLY]: 'PC',
+    [AttendanceStatus.NO_CHECKOUT]: 'NC',
 };
 
 const AIRecapPage: React.FC = () => {
@@ -81,11 +82,14 @@ const AIRecapPage: React.FC = () => {
                 l.studentId === s.id && l.timestamp.toISOString().startsWith(currentMonth)
             );
             
-            const stats = { H: 0, T: 0, S: 0, I: 0, A: 0, PC: 0 };
+            const stats = { H: 0, T: 0, S: 0, I: 0, A: 0, PC: 0, NC: 0 };
             logs.forEach(l => {
+                // Consider 'in' logs for most statuses, but for NO_CHECKOUT, we usually check 'out' logs
                 if (l.type === 'in') {
                     const key = statusMap[l.status];
-                    if (key && key in stats) stats[key as keyof typeof stats]++;
+                    if (key && key in stats && key !== 'NC') stats[key as keyof typeof stats]++;
+                } else if (l.type === 'out' && l.status === AttendanceStatus.NO_CHECKOUT) {
+                    stats.NC++;
                 }
             });
             
@@ -99,7 +103,7 @@ const AIRecapPage: React.FC = () => {
         Nama Sekolah: ${settings?.schoolName}
         Total Siswa: ${students.length}
         Daftar Kelas: ${classes.map(c => c.name).join(', ')}
-        Kode Absensi: H=Hadir, T=Terlambat, S=Sakit, I=Izin, A=Alfa, PC=Pulang Cepat
+        Kode Absensi: H=Hadir, T=Terlambat, S=Sakit, I=Izin, A=Alfa, PC=Pulang Cepat, NC=Tidak Scan Pulang
         `;
 
         return `

@@ -13,6 +13,7 @@ const breadcrumbNameMap: { [key: string]: string } = {
   '/admin/reports': 'Laporan Bulanan',
   '/admin/daily-reports': 'Laporan Harian',
   '/admin/periodic-reports': 'Laporan Periodik',
+  '/admin/individual-report': 'Laporan Individu',
   '/admin/attendance-history': 'Riwayat Absensi',
   '/admin/settings': 'Pengaturan',
 };

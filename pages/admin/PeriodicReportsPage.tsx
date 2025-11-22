@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FiPrinter, FiDownload, FiCheck, FiX, FiClock, FiHelpCircle, FiActivity } from 'react-icons/fi';
+import { FiPrinter, FiDownload, FiCheck, FiX, FiClock, FiHelpCircle, FiActivity, FiAlertTriangle } from 'react-icons/fi';
 import { useData } from '../../contexts/DataContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { Student, AttendanceStatus } from '../../types';
@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 declare const Swal: any;
 
 // Type definitions specific to this report
-type StatusKey = 'H' | 'T' | 'S' | 'I' | 'A';
+type StatusKey = 'H' | 'T' | 'S' | 'I' | 'A' | 'NC';
 
 interface StudentReportRow {
   student: Student;
@@ -17,7 +17,7 @@ interface StudentReportRow {
 
 interface GeneratedReport {
   studentData: StudentReportRow[];
-  overallSummary: { Hadir: number; Terlambat: number; Sakit: number; Izin: number; Alfa: number; };
+  overallSummary: { Hadir: number; Terlambat: number; Sakit: number; Izin: number; Alfa: number; NoCheckout: number; };
   period: string;
 }
 
@@ -50,6 +50,7 @@ const statusMap: { [key in AttendanceStatus]: { key: StatusKey, text: string, co
   [AttendanceStatus.PERMIT]: { key: 'I', text: 'Izin', color: 'text-indigo-700', bgColor: 'bg-indigo-100', icon: <FiHelpCircle/> },
   [AttendanceStatus.ABSENT]: { key: 'A', text: 'Alfa', color: 'text-red-700', bgColor: 'bg-red-100', icon: <FiX/> },
   [AttendanceStatus.LEAVE_EARLY]: { key: 'H', text: 'Hadir', color: 'text-green-700', bgColor: 'bg-green-100', icon: <FiCheck/> },
+  [AttendanceStatus.NO_CHECKOUT]: { key: 'NC', text: 'Tidak Scan Plg', color: 'text-orange-700', bgColor: 'bg-orange-100', icon: <FiAlertTriangle/> },
 };
 
 // SummaryCard component from existing report pages
@@ -94,17 +95,28 @@ const PeriodicReportsPage: React.FC = () => {
         const holidays = new Set(settings?.holidays || []);
         
         const studentData: StudentReportRow[] = filteredStudents.map(student => {
-            const summary: Record<StatusKey, number> = { H: 0, T: 0, S: 0, I: 0, A: 0 };
+            const summary: Record<StatusKey, number> = { H: 0, T: 0, S: 0, I: 0, A: 0, NC: 0 };
             
             datesInRange.forEach(date => {
                 const dateStr = toLocalISOString(date);
                 
                 const dayLogs = logsInRange.filter(log => log.studentId === student.id && toLocalISOString(new Date(log.timestamp)) === dateStr);
+                
+                // Check OUT log first for No Checkout status
+                const outLog = dayLogs.find(l => l.type === 'out');
                 const checkInLog = dayLogs.find(l => l.type === 'in');
                 
-                if (checkInLog) {
+                let assignedKey: StatusKey | null = null;
+
+                if (outLog && outLog.status === AttendanceStatus.NO_CHECKOUT) {
+                    assignedKey = 'NC';
+                } else if (checkInLog) {
                     const statusInfo = statusMap[checkInLog.status];
-                    if (summary[statusInfo.key] !== undefined) { summary[statusInfo.key]++; }
+                    assignedKey = statusInfo.key;
+                }
+
+                if (assignedKey) {
+                    if (summary[assignedKey] !== undefined) { summary[assignedKey]++; }
                 } else {
                     if (holidays.has(dateStr)) return; // Skip holidays
 
@@ -122,8 +134,8 @@ const PeriodicReportsPage: React.FC = () => {
 
         const overallSummary = studentData.reduce((acc, row) => {
             acc.Hadir += row.summary.H; acc.Terlambat += row.summary.T; acc.Sakit += row.summary.S;
-            acc.Izin += row.summary.I; acc.Alfa += row.summary.A; return acc;
-        }, { Hadir: 0, Terlambat: 0, Sakit: 0, Izin: 0, Alfa: 0 });
+            acc.Izin += row.summary.I; acc.Alfa += row.summary.A; acc.NoCheckout += row.summary.NC; return acc;
+        }, { Hadir: 0, Terlambat: 0, Sakit: 0, Izin: 0, Alfa: 0, NoCheckout: 0 });
 
         setReportData({ studentData, overallSummary, period: periodString });
     };
@@ -133,7 +145,7 @@ const PeriodicReportsPage: React.FC = () => {
         const { studentData, period } = reportData;
         const className = classFilter ? classes.find(c => c.id === classFilter)?.name : 'Semua Kelas';
         let htmlContent = `
-            <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Laporan Rekap Absensi - ${period}</title><style>body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; margin: 0; font-size: 10pt; background-color: #fff; color: #333; } .page-container { padding: 1.5cm; } .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; } .header img { height: 60px; width: 60px; object-fit: contain; margin-right: 20px; } .header-text { flex-grow: 1; } .header-text h1 { margin: 0; font-size: 18pt; font-weight: 600; } .header-text h2 { margin: 0; font-size: 12pt; font-weight: 400; color: #555; } .report-info { text-align: right; font-size: 10pt; } table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; } thead th { background-color: #f2f2f2; color: #333; font-weight: 600; } .col-student { text-align: left; white-space: nowrap; width: 40%; } .col-nis { white-space: nowrap; font-family: 'Courier New', Courier, monospace; width: 15%; } tbody tr:nth-child(even) { background-color: #f9f9f9; } .summary-col { font-weight: bold; } .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; font-size: 8pt; color: #777; display: flex; justify-content: space-between; } .signature-block { margin-top: 50px; text-align: right; } .signature-block .location-date { margin-bottom: 5px; } .signature-block .role { margin-bottom: 60px; } .signature-block .name { font-weight: bold; text-decoration: underline; } @media print { @page { size: A4 portrait; margin: 0; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style></head><body><div class="page-container"><div class="header">${settings?.schoolLogoUrl ? `<img src="${settings.schoolLogoUrl}" alt="Logo">` : ''}<div class="header-text"><h1>Laporan Rekapitulasi Absensi</h1><h2>${settings?.schoolName || 'Sistem Absensi RFID'}</h2></div><div class="report-info"><strong>Periode:</strong><br>${period}<br><strong>Kelas:</strong> ${className}</div></div><table><thead><tr><th class="col-student">NAMA SISWA</th><th class="col-nis">NIS</th><th class="summary-col">Hadir</th> <th class="summary-col">Terlambat</th><th class="summary-col">Sakit</th> <th class="summary-col">Izin</th><th class="summary-col">Alfa</th></tr></thead><tbody>${studentData.map(row => `<tr><td class="col-student">${row.student.name}</td><td class="col-nis">${row.student.nis}</td><td>${row.summary.H || 0}</td><td>${row.summary.T || 0}</td><td>${row.summary.S || 0}</td><td>${row.summary.I || 0}</td><td>${row.summary.A || 0}</td></tr>`).join('')}</tbody></table><div class="signature-block"><p class="location-date">Rowosari, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p><p class="role">Kepala Madrasah,</p><p class="name">_________________________</p></div><div class="footer"><span>Dicetak pada: ${new Date().toLocaleString('id-ID')}</span><span>Laporan ini dibuat oleh Sistem Absensi RFID</span></div></div></body></html>`;
+            <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Laporan Rekap Absensi - ${period}</title><style>body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; margin: 0; font-size: 10pt; background-color: #fff; color: #333; } .page-container { padding: 1.5cm; } .header { display: flex; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; } .header img { height: 60px; width: 60px; object-fit: contain; margin-right: 20px; } .header-text { flex-grow: 1; } .header-text h1 { margin: 0; font-size: 18pt; font-weight: 600; } .header-text h2 { margin: 0; font-size: 12pt; font-weight: 400; color: #555; } .report-info { text-align: right; font-size: 10pt; } table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; } thead th { background-color: #f2f2f2; color: #333; font-weight: 600; } .col-student { text-align: left; white-space: nowrap; width: 40%; } .col-nis { white-space: nowrap; font-family: 'Courier New', Courier, monospace; width: 15%; } tbody tr:nth-child(even) { background-color: #f9f9f9; } .summary-col { font-weight: bold; } .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ccc; font-size: 8pt; color: #777; display: flex; justify-content: space-between; } .signature-block { margin-top: 50px; text-align: right; } .signature-block .location-date { margin-bottom: 5px; } .signature-block .role { margin-bottom: 60px; } .signature-block .name { font-weight: bold; text-decoration: underline; } @media print { @page { size: A4 portrait; margin: 0; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style></head><body><div class="page-container"><div class="header">${settings?.schoolLogoUrl ? `<img src="${settings.schoolLogoUrl}" alt="Logo">` : ''}<div class="header-text"><h1>Laporan Rekapitulasi Absensi</h1><h2>${settings?.schoolName || 'Sistem Absensi RFID'}</h2></div><div class="report-info"><strong>Periode:</strong><br>${period}<br><strong>Kelas:</strong> ${className}</div></div><table><thead><tr><th class="col-student">NAMA SISWA</th><th class="col-nis">NIS</th><th class="summary-col">Hadir</th> <th class="summary-col">Terlambat</th><th class="summary-col">Sakit</th> <th class="summary-col">Izin</th><th class="summary-col">Alfa</th><th class="summary-col">NC</th></tr></thead><tbody>${studentData.map(row => `<tr><td class="col-student">${row.student.name}</td><td class="col-nis">${row.student.nis}</td><td>${row.summary.H || 0}</td><td>${row.summary.T || 0}</td><td>${row.summary.S || 0}</td><td>${row.summary.I || 0}</td><td>${row.summary.A || 0}</td><td>${row.summary.NC || 0}</td></tr>`).join('')}</tbody></table><div class="signature-block"><p class="location-date">Rowosari, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p><p class="role">Kepala Madrasah,</p><p class="name">_________________________</p></div><div class="footer"><span>Dicetak pada: ${new Date().toLocaleString('id-ID')}</span><span>Laporan ini dibuat oleh Sistem Absensi RFID</span></div></div></body></html>`;
         const printWindow = window.open('', '_blank');
         if (printWindow) { printWindow.document.open(); printWindow.document.write(htmlContent); printWindow.document.close(); setTimeout(() => { printWindow.print(); }, 250); } else { alert('Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini.'); }
     };
@@ -152,6 +164,7 @@ const PeriodicReportsPage: React.FC = () => {
             "Sakit": row.summary.S,
             "Izin": row.summary.I,
             "Alfa": row.summary.A,
+            "Tidak Scan": row.summary.NC,
         }));
         
         const title = `Laporan Rekapitulasi Absensi Periodik - ${className}`;
@@ -162,13 +175,13 @@ const PeriodicReportsPage: React.FC = () => {
         XLSX.utils.sheet_add_aoa(worksheet, [[title], [periodInfo], []], { origin: 'A1' });
         
         worksheet['!merges'] = [
-            { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
-            { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+            { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
         ];
 
         worksheet['!cols'] = [
             { wch: 30 }, { wch: 15 }, { wch: 10 }, { wch: 10 },
-            { wch: 10 }, { wch: 10 }, { wch: 10 },
+            { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
         ];
 
         const workbook = XLSX.utils.book_new();
@@ -222,12 +235,13 @@ const PeriodicReportsPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                 <SummaryCard title="Total Hadir" value={reportData.overallSummary.Hadir} color="border-green-400" />
                 <SummaryCard title="Total Terlambat" value={reportData.overallSummary.Terlambat} color="border-yellow-400" />
                 <SummaryCard title="Total Sakit" value={reportData.overallSummary.Sakit} color="border-blue-400" />
                 <SummaryCard title="Total Izin" value={reportData.overallSummary.Izin} color="border-indigo-400" />
                 <SummaryCard title="Total Alfa" value={reportData.overallSummary.Alfa} color="border-red-400" />
+                <SummaryCard title="Tidak Scan" value={reportData.overallSummary.NoCheckout} color="border-orange-400" />
             </div>
             
             <div className="overflow-x-auto">
@@ -241,6 +255,7 @@ const PeriodicReportsPage: React.FC = () => {
                             <th className="p-3 border border-slate-200 text-center font-semibold text-blue-600 bg-blue-50">Sakit</th>
                             <th className="p-3 border border-slate-200 text-center font-semibold text-indigo-600 bg-indigo-50">Izin</th>
                             <th className="p-3 border border-slate-200 text-center font-semibold text-red-600 bg-red-50">Alfa</th>
+                            <th className="p-3 border border-slate-200 text-center font-semibold text-orange-600 bg-orange-50">NC</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -253,6 +268,7 @@ const PeriodicReportsPage: React.FC = () => {
                                 <td className="p-2 border border-slate-200 text-center font-bold">{row.summary.S || 0}</td>
                                 <td className="p-2 border border-slate-200 text-center font-bold">{row.summary.I || 0}</td>
                                 <td className="p-2 border border-slate-200 text-center font-bold">{row.summary.A || 0}</td>
+                                <td className="p-2 border border-slate-200 text-center font-bold">{row.summary.NC || 0}</td>
                             </tr>
                         ))}
                     </tbody>

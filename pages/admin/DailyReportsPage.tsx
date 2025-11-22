@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { useSettings } from '../../contexts/SettingsContext';
 import { Student, AttendanceStatus } from '../../types';
-import { FiClipboard, FiPrinter, FiUserCheck, FiClock, FiAlertCircle, FiHelpCircle, FiList } from 'react-icons/fi';
+import { FiClipboard, FiPrinter, FiUserCheck, FiClock, FiAlertCircle, FiHelpCircle, FiList, FiAlertTriangle } from 'react-icons/fi';
 
 interface DailyReportData {
   date: string;
@@ -13,6 +13,7 @@ interface DailyReportData {
   sick: Student[];
   permit: Student[];
   absent: Student[];
+  noCheckout: Student[]; // Added
 }
 
 const toLocalISOString = (date: Date) => {
@@ -35,15 +36,15 @@ const StatusCard: React.FC<{ title: string; students: Student[]; icon: React.Rea
     <div className={`bg-white rounded-lg shadow-sm border border-slate-200 flex flex-col border-t-4 ${color}`}>
         <div className="flex items-center p-4">
             {icon}
-            <h3 className="font-semibold ml-3 text-slate-700">{title}</h3>
+            <h3 className="font-semibold ml-3 text-slate-700 text-sm">{title}</h3>
             <span className="ml-auto font-bold text-lg text-slate-800">{students.length}</span>
         </div>
-        <div className="p-2 space-y-1 overflow-y-auto max-h-80 flex-1 bg-slate-50/50">
+        <div className="p-2 space-y-1 overflow-y-auto max-h-60 flex-1 bg-slate-50/50 scrollbar-thin">
             {students.length > 0 ? (
                 students.map(s => <StudentListItem key={s.id} student={s} />)
             ) : (
                 <div className="flex items-center justify-center h-full">
-                    <p className="text-center text-slate-500 py-4 text-sm">Tidak ada data</p>
+                    <p className="text-center text-slate-500 py-4 text-xs">Tidak ada data</p>
                 </div>
             )}
         </div>
@@ -74,25 +75,30 @@ const DailyReportsPage: React.FC = () => {
     const lateIds = new Set<string>();
     const sickIds = new Set<string>();
     const permitIds = new Set<string>();
+    const noCheckoutIds = new Set<string>();
 
     logsForDay.forEach(log => {
-      // Only count 'in' logs for status categorization to avoid double counting 'out' logs
-      if (log.type === 'in') {
-          if (log.status === AttendanceStatus.SICK) sickIds.add(log.studentId);
-          else if (log.status === AttendanceStatus.PERMIT) permitIds.add(log.studentId);
-          else if (log.status === AttendanceStatus.LATE) lateIds.add(log.studentId);
-          else presentIds.add(log.studentId);
-      }
+      // Categorize based on status
+      if (log.status === AttendanceStatus.SICK) sickIds.add(log.studentId);
+      else if (log.status === AttendanceStatus.PERMIT) permitIds.add(log.studentId);
+      else if (log.status === AttendanceStatus.NO_CHECKOUT) noCheckoutIds.add(log.studentId);
+      else if (log.status === AttendanceStatus.LATE && log.type === 'in') lateIds.add(log.studentId);
+      else if (log.type === 'in') presentIds.add(log.studentId);
     });
 
-    const allAttendedIds = new Set([...presentIds, ...lateIds, ...sickIds, ...permitIds]);
+    // Note: Students might be in 'presentIds' AND 'noCheckoutIds'.
+    // For the Absent calculation, we check if they have ANY attendance record.
+    const allAttendedIds = new Set([...presentIds, ...lateIds, ...sickIds, ...permitIds, ...noCheckoutIds]);
     const findStudentsByIds = (ids: Set<string>) => Array.from(ids).map(id => students.find(s => s.id === id)).filter((s): s is Student => !!s);
 
     setReportData({
       date: selectedDate.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
       className: classFilter ? classes.find(c => c.id === classFilter)?.name || 'Semua Kelas' : 'Semua Kelas',
-      present: findStudentsByIds(presentIds), late: findStudentsByIds(lateIds),
-      sick: findStudentsByIds(sickIds), permit: findStudentsByIds(permitIds),
+      present: findStudentsByIds(presentIds),
+      late: findStudentsByIds(lateIds),
+      sick: findStudentsByIds(sickIds),
+      permit: findStudentsByIds(permitIds),
+      noCheckout: findStudentsByIds(noCheckoutIds),
       absent: filteredStudents.filter(s => !allAttendedIds.has(s.id)),
     });
   };
@@ -102,32 +108,44 @@ const DailyReportsPage: React.FC = () => {
       if (!reportData) return [];
       const selectedDateStr = date; // YYYY-MM-DD from state
 
-      // Pre-filter logs for the day to optimize
+      // Pre-filter logs for the day
       const dayLogs = attendanceLogs.filter(l => 
-          toLocalISOString(new Date(l.timestamp)).startsWith(selectedDateStr) && 
-          l.type === 'in'
+          toLocalISOString(new Date(l.timestamp)).startsWith(selectedDateStr)
       );
 
       const recap = classes.map(cls => {
           const classStudents = students.filter(s => s.classId === cls.id);
-          let h = 0, s = 0, i = 0, a = 0;
+          let h = 0, s = 0, i = 0, a = 0, nc = 0;
 
           classStudents.forEach(student => {
-              const log = dayLogs.find(l => l.studentId === student.id);
-              if (log) {
-                  if (log.status === AttendanceStatus.SICK) s++;
-                  else if (log.status === AttendanceStatus.PERMIT) i++;
-                  else if (log.status === AttendanceStatus.ABSENT) a++; // If explicitly marked as Alfa
-                  else h++; // Present, Late, Leave Early -> All count as 'Hadir'
+              // Check for specific statuses for this student
+              const studentLogs = dayLogs.filter(l => l.studentId === student.id);
+              
+              // Check NC first or independently
+              if (studentLogs.some(l => l.status === AttendanceStatus.NO_CHECKOUT)) {
+                  nc++;
+              }
+
+              // Main status Check
+              const inLog = studentLogs.find(l => l.type === 'in' || l.status === AttendanceStatus.SICK || l.status === AttendanceStatus.PERMIT);
+              
+              if (inLog) {
+                  if (inLog.status === AttendanceStatus.SICK) s++;
+                  else if (inLog.status === AttendanceStatus.PERMIT) i++;
+                  else if (inLog.status === AttendanceStatus.ABSENT) a++;
+                  else h++; // Present/Late counts as Hadir in summary
               } else {
-                  a++; // No log -> Alfa
+                  // If no logs at all, and not NC (which implies they had an IN log but forgot OUT), then Absent
+                  // However, NC logic implies they DID scan IN. So usually NC students also have an IN log.
+                  // If no logs found at all:
+                  if (studentLogs.length === 0) a++;
               }
           });
 
           return {
               id: cls.id,
               name: cls.name,
-              h, s, i, a,
+              h, s, i, a, nc,
               total: classStudents.length
           };
       });
@@ -143,17 +161,23 @@ const DailyReportsPage: React.FC = () => {
           s: acc.s + curr.s,
           i: acc.i + curr.i,
           a: acc.a + curr.a,
+          nc: acc.nc + curr.nc,
           total: acc.total + curr.total
-      }), { h: 0, s: 0, i: 0, a: 0, total: 0 });
+      }), { h: 0, s: 0, i: 0, a: 0, nc: 0, total: 0 });
   }, [classRecap]);
   
   const handlePrint = () => {
     if (!reportData) return;
-    const { date, className, present, late, sick, permit, absent } = reportData;
-    const { late: lateStudents, absent: absentStudents, sick: sickStudents, permit: permitStudents } = { late, absent, sick, permit };
-    const studentGroupsToPrint = { late: lateStudents, absent: absentStudents, sick: sickStudents, permit: permitStudents };
-
-    const groupDetails = { late: { title: "Terlambat", class: "status-late" }, absent: { title: "Belum Hadir / Alfa", class: "status-absent" }, sick: { title: "Sakit", class: "status-sick" }, permit: { title: "Izin", class: "status-permit" } };
+    const { date, className, present, late, sick, permit, absent, noCheckout } = reportData;
+    
+    // Groups to print
+    const studentGroupsToPrint = { 
+        late: { list: late, title: "Terlambat", class: "status-late" }, 
+        noCheckout: { list: noCheckout, title: "Tidak Scan Pulang", class: "status-nc" },
+        absent: { list: absent, title: "Belum Hadir / Alfa", class: "status-absent" }, 
+        sick: { list: sick, title: "Sakit", class: "status-sick" }, 
+        permit: { list: permit, title: "Izin", class: "status-permit" } 
+    };
     
     // Generate Recap Table HTML
     const recapRows = classRecap.map((row, index) => `
@@ -164,6 +188,7 @@ const DailyReportsPage: React.FC = () => {
             <td>${row.a}</td>
             <td>${row.i}</td>
             <td>${row.s}</td>
+            <td style="background-color: #fff7ed; color: #c2410c;">${row.nc}</td>
             <td><strong>${row.total}</strong></td>
         </tr>
     `).join('');
@@ -175,6 +200,7 @@ const DailyReportsPage: React.FC = () => {
             <td>${recapTotals.a}</td>
             <td>${recapTotals.i}</td>
             <td>${recapTotals.s}</td>
+            <td style="color: #c2410c;">${recapTotals.nc}</td>
             <td>${recapTotals.total}</td>
         </tr>
     `;
@@ -208,6 +234,7 @@ const DailyReportsPage: React.FC = () => {
             .status-section { border: 1px solid #ddd; border-radius: 8px; page-break-inside: avoid; overflow: hidden; margin-bottom: 10px; }
             .status-section h3 { margin: 0; padding: 10px 15px; font-size: 11pt; border-bottom: 1px solid #ddd; }
             .status-late h3 { background-color: #fef3c7; border-left: 5px solid #f59e0b; }
+            .status-nc h3 { background-color: #ffedd5; border-left: 5px solid #f97316; }
             .status-absent h3 { background-color: #fee2e2; border-left: 5px solid #ef4444; }
             .status-sick h3 { background-color: #dbeafe; border-left: 5px solid #3b82f6; }
             .status-permit h3 { background-color: #e0e7ff; border-left: 5px solid #6366f1; }
@@ -247,6 +274,7 @@ const DailyReportsPage: React.FC = () => {
                             <th>TIDAK HADIR</th>
                             <th>IZIN</th>
                             <th>SAKIT</th>
+                            <th style="background-color: #ffedd5; color: #c2410c;">TDK SCAN PLG</th>
                             <th>TOTAL</th>
                         </tr>
                     </thead>
@@ -261,22 +289,21 @@ const DailyReportsPage: React.FC = () => {
 
             <div class="summary-grid">
                 <div class="summary-item"><div class="count">${present.length + late.length}</div><div class="label">Total Hadir</div></div>
-                <div class="summary-item"><div class="count">${present.length}</div><div class="label">Tepat Waktu</div></div>
                 <div class="summary-item"><div class="count">${late.length}</div><div class="label">Terlambat</div></div>
+                <div class="summary-item"><div class="count" style="color: #c2410c;">${noCheckout.length}</div><div class="label">Tidak Scan Plg</div></div>
                 <div class="summary-item"><div class="count">${absent.length}</div><div class="label">Belum Hadir</div></div>
                 <div class="summary-item"><div class="count">${sick.length + permit.length}</div><div class="label">Izin/Sakit</div></div>
             </div>
 
             <div class="content-grid">
-                ${Object.entries(studentGroupsToPrint).map(([status, studentList]) => { 
-                    const detail = groupDetails[status as keyof typeof groupDetails]; 
+                ${Object.values(studentGroupsToPrint).map((group) => { 
                     return `
-                        <div class="status-section ${detail.class}">
-                            <h3>${detail.title} (${studentList.length})</h3>
-                            ${studentList.length > 0 ? `
+                        <div class="status-section ${group.class}">
+                            <h3>${group.title} (${group.list.length})</h3>
+                            ${group.list.length > 0 ? `
                                 <table class="student-list">
                                     <thead><tr><th>Nama Siswa</th><th>NIS</th></tr></thead>
-                                    <tbody>${studentList.map(s => `<tr><td>${s.name}</td><td class="nis">${s.nis}</td></tr>`).join('')}</tbody>
+                                    <tbody>${group.list.map(s => `<tr><td>${s.name}</td><td class="nis">${s.nis}</td></tr>`).join('')}</tbody>
                                 </table>
                             ` : `<p class="no-data">Tidak ada data</p>`}
                         </div>` 
@@ -329,9 +356,10 @@ const DailyReportsPage: React.FC = () => {
               <button onClick={handlePrint} className="bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-800 flex items-center no-print transition-colors"><FiPrinter className="mr-2"/>Cetak Laporan</button>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
             <StatusCard title="Hadir Tepat Waktu" students={reportData.present} icon={<FiUserCheck size={20} className="text-green-600"/>} color="border-green-500"/>
             <StatusCard title="Terlambat" students={reportData.late} icon={<FiClock size={20} className="text-yellow-600"/>} color="border-yellow-500"/>
+            <StatusCard title="Tidak Scan Plg" students={reportData.noCheckout} icon={<FiAlertTriangle size={20} className="text-orange-600"/>} color="border-orange-500"/>
             <StatusCard title="Belum Hadir" students={reportData.absent} icon={<FiAlertCircle size={20} className="text-red-600"/>} color="border-red-500"/>
             <StatusCard title="Sakit" students={reportData.sick} icon={<FiHelpCircle size={20} className="text-blue-600"/>} color="border-blue-500"/>
             <StatusCard title="Izin" students={reportData.permit} icon={<FiHelpCircle size={20} className="text-indigo-600"/>} color="border-indigo-500"/>
@@ -353,6 +381,7 @@ const DailyReportsPage: React.FC = () => {
                               <th className="border border-slate-200 p-3 bg-red-50 text-red-800">Tidak Hadir</th>
                               <th className="border border-slate-200 p-3 bg-indigo-50 text-indigo-800">Izin</th>
                               <th className="border border-slate-200 p-3 bg-blue-50 text-blue-800">Sakit</th>
+                              <th className="border border-slate-200 p-3 bg-orange-50 text-orange-800">Tdk Scan Plg</th>
                               <th className="border border-slate-200 p-3 font-bold bg-slate-100">Jumlah Total</th>
                           </tr>
                       </thead>
@@ -365,6 +394,7 @@ const DailyReportsPage: React.FC = () => {
                                   <td className="border border-slate-200 p-2">{row.a}</td>
                                   <td className="border border-slate-200 p-2">{row.i}</td>
                                   <td className="border border-slate-200 p-2">{row.s}</td>
+                                  <td className="border border-slate-200 p-2 text-orange-600 font-semibold">{row.nc}</td>
                                   <td className="border border-slate-200 p-2 font-bold">{row.total}</td>
                               </tr>
                           ))}
@@ -376,6 +406,7 @@ const DailyReportsPage: React.FC = () => {
                               <td className="border border-slate-200 p-3">{recapTotals.a}</td>
                               <td className="border border-slate-200 p-3">{recapTotals.i}</td>
                               <td className="border border-slate-200 p-3">{recapTotals.s}</td>
+                              <td className="border border-slate-200 p-3 text-orange-600">{recapTotals.nc}</td>
                               <td className="border border-slate-200 p-3">{recapTotals.total}</td>
                           </tr>
                       </tfoot>
