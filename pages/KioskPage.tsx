@@ -83,6 +83,15 @@ const KioskPage: React.FC = () => {
 
   const attendancePeriod = getAttendancePeriod(currentTime);
 
+  // Helper to get dynamic greeting
+  const getTimeBasedGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour >= 3 && hour < 11) return 'Pagi';
+    if (hour >= 11 && hour < 15) return 'Siang';
+    if (hour >= 15 && hour < 18) return 'Sore';
+    return 'Malam';
+  };
+
   const handleScan = useCallback(async (uid: string) => {
     if (isProcessingRef.current) return;
 
@@ -284,7 +293,9 @@ const KioskPage: React.FC = () => {
             <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight drop-shadow-sm transition-all duration-500">
                 {settings?.schoolName || 'Sistem Absensi'}
             </h1>
-            <p className="text-lg text-slate-600 mt-3 font-medium opacity-90">Selamat Datang! Silakan tempelkan kartu RFID Anda.</p>
+            <p className="text-lg text-slate-600 mt-3 font-medium opacity-90">
+              Selamat {getTimeBasedGreeting()}! Silakan tempelkan kartu Identitas Kamu.
+            </p>
           </div>
           
           {/* Clock Section - Now the Hero (replaces the old card box) */}
