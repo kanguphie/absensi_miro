@@ -8,13 +8,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
             },
             colors: {
               indigo: {
@@ -32,22 +33,19 @@
             },
             animation: {
               blob: "blob 7s infinite",
+              'hud-enter': "hudEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
             },
             keyframes: {
               blob: {
-                "0%": {
-                  transform: "translate(0px, 0px) scale(1)",
-                },
-                "33%": {
-                  transform: "translate(30px, -50px) scale(1.1)",
-                },
-                "66%": {
-                  transform: "translate(-20px, 20px) scale(0.9)",
-                },
-                "100%": {
-                  transform: "translate(0px, 0px) scale(1)",
-                },
+                "0%": { transform: "translate(0px, 0px) scale(1)" },
+                "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+                "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+                "100%": { transform: "translate(0px, 0px) scale(1)" },
               },
+              hudEnter: {
+                "0%": { opacity: 0, transform: "scale(0.9) translateY(20px)" },
+                "100%": { opacity: 1, transform: "scale(1) translateY(0)" },
+              }
             },
           },
         },
@@ -125,6 +123,43 @@
       }
       .animation-delay-4000 {
         animation-delay: 4s;
+      }
+
+      /* --- NEW ANIMATIONS FOR KIOSK --- */
+      
+      /* Spring Transition for properties (width, background, transform) */
+      .transition-spring {
+        transition-property: all;
+        transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition-duration: 500ms;
+      }
+
+      /* Float animation for Idle state */
+      .animate-float {
+        animation: float 4s ease-in-out infinite;
+      }
+      @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-8px); }
+        100% { transform: translateY(0px); }
+      }
+
+      /* Scale In with Spring effect */
+      .animate-scale-spring {
+        animation: scaleSpring 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      @keyframes scaleSpring {
+        0% { transform: scale(0.8); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      /* Ripple/Ping effect for scanning */
+      .animate-ripple {
+        animation: ripple 1s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+      }
+      @keyframes ripple {
+        0% { transform: scale(1); opacity: 0.5; }
+        100% { transform: scale(1.5); opacity: 0; }
       }
     </style>
   <script type="importmap">
