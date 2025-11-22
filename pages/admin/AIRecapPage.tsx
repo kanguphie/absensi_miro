@@ -44,6 +44,7 @@ const AIRecapPage: React.FC = () => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Effect to show warning if no API key is found
     useEffect(() => {
@@ -70,6 +71,16 @@ const AIRecapPage: React.FC = () => {
     };
 
     useEffect(scrollToBottom, [messages]);
+
+    // Auto-resize textarea logic
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'; // Reset height
+            const scrollHeight = textareaRef.current.scrollHeight;
+            // Cap max height at 150px, min height at 48px (py-3 = 12px top/bottom + line height)
+            textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, 48), 150)}px`;
+        }
+    }, [input]);
 
     const buildSystemPrompt = () => {
         const today = new Date();
@@ -126,8 +137,8 @@ const AIRecapPage: React.FC = () => {
         `;
     };
 
-    const handleSend = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSend = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         if (!input.trim()) return;
         
         // Prevent sending if no API Key
@@ -143,6 +154,9 @@ const AIRecapPage: React.FC = () => {
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setIsTyping(true);
+        
+        // Reset height immediately
+        if (textareaRef.current) textareaRef.current.style.height = '48px';
 
         try {
             const systemPrompt = buildSystemPrompt();
@@ -195,6 +209,13 @@ const AIRecapPage: React.FC = () => {
             setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsTyping(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
         }
     };
 
@@ -282,18 +303,21 @@ const AIRecapPage: React.FC = () => {
                 <div className="p-5 bg-white border-t border-slate-200">
                     <form onSubmit={handleSend} className="relative">
                         <div className="relative">
-                            <input
-                                type="text"
+                            <textarea
+                                ref={textareaRef}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Tanya tentang data absensi... (Contoh: 'Siapa yang paling sering terlambat?')"
-                                className="w-full border border-slate-300 rounded-xl px-4 py-3 pr-14 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm placeholder-slate-400 text-slate-800 bg-white"
+                                onKeyDown={handleKeyDown}
+                                placeholder="Tanya tentang data absensi... (Shift+Enter untuk baris baru)"
+                                className="w-full border border-slate-300 rounded-xl px-4 py-3 pr-14 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm placeholder-slate-400 text-slate-800 bg-white resize-none overflow-y-auto"
                                 disabled={isTyping}
+                                rows={1}
+                                style={{ minHeight: '48px', maxHeight: '150px' }}
                             />
                             <button 
                                 type="submit" 
                                 disabled={!input.trim() || isTyping || !hasApiKey}
-                                className="absolute right-2 top-1.5 bottom-1.5 bg-indigo-600 text-white px-3 rounded-lg hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center shadow-sm aspect-square"
+                                className="absolute right-2 bottom-2.5 bg-indigo-600 text-white px-3 h-9 w-9 rounded-lg hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center shadow-sm"
                             >
                                 {isTyping ? <FiCpu className="animate-spin" /> : <FiSend />}
                             </button>
